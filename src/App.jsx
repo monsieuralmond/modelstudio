@@ -2312,6 +2312,17 @@ export default function App() {
                   </div>
                   <span className="status-pill">{projectModes[mode].badge}</span>
                 </div>
+                <div className="simple-intro-band">
+                  <div>
+                    <strong>초보자는 이 순서만 따라가면 됩니다.</strong>
+                    <p>로봇 연결, 카메라 확인, 클립 수집, GPU 학습 시작까지 필요한 기능만 앞에 배치했습니다.</p>
+                  </div>
+                  <div className="simple-intro-actions">
+                    <button className="secondary-button" onClick={() => setStudioView("developer")} type="button">
+                      개발자 화면 열기
+                    </button>
+                  </div>
+                </div>
                 <div className="simple-summary-grid">
                   <div className="summary-card">
                     <span>연결 상태</span>
@@ -2330,6 +2341,89 @@ export default function App() {
                     <strong>{latestGpuJob ? gpuJobStateLabels[latestGpuJob.state] || latestGpuJob.state : "아직 없음"}</strong>
                   </div>
                 </div>
+                {mode === "audio" ? (
+                  <section className="panel simple-camera-panel">
+                    <div className="panel-header">
+                      <div>
+                        <p className="mini-label">카메라 화면</p>
+                        <h3>{projectModes[mode].previewLabel}</h3>
+                      </div>
+                      <button
+                        className="secondary-button"
+                        disabled={isModelLoading || (mode === "audio" && isCurrentModeReady)}
+                        onClick={() => void prepareCurrentMode()}
+                        type="button"
+                      >
+                        {isModelLoading ? "불러오는 중..." : inputButtonLabel}
+                      </button>
+                    </div>
+                    <div className="audio-stage simple-audio-stage">
+                      <div className="audio-bars">
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                      <div className="audio-stage-copy">
+                        <strong>{isPreviewRunning ? "실시간 마이크 미리보기" : "마이크 준비 완료"}</strong>
+                        <p>{projectModes.audio.helper}</p>
+                      </div>
+                    </div>
+                  </section>
+                ) : (
+                  <section className="panel simple-camera-panel">
+                    <div className="camera-analytics-layout simple-camera-layout">
+                      <section className="camera-stage-panel">
+                        <div className="panel-header">
+                          <div>
+                            <p className="mini-label">카메라 화면</p>
+                            <h3>{projectModes[mode].previewLabel}</h3>
+                          </div>
+                          <button
+                            className="secondary-button"
+                            disabled={isModelLoading}
+                            onClick={() => void prepareCurrentMode()}
+                            type="button"
+                          >
+                            {isModelLoading ? "불러오는 중..." : inputButtonLabel}
+                          </button>
+                        </div>
+                        <div className={`camera-stage ${mode}`}>
+                          {mode === "image" ? (
+                            <video muted playsInline ref={imageVideoRef} />
+                          ) : (
+                            <>
+                              <video muted playsInline ref={poseVideoRef} />
+                              <canvas className="pose-overlay-canvas" ref={poseCanvasRef} />
+                            </>
+                          )}
+                          {!((mode === "image" && isImageCameraOn) || (mode === "pose" && isPoseCameraOn)) && (
+                            <div className="camera-placeholder">
+                              <div className="camera-placeholder-copy">
+                                <strong>{projectModes[mode].previewLabel}</strong>
+                                <p>{projectModes[mode].helper}</p>
+                              </div>
+                            </div>
+                          )}
+                          <div className="camera-overlay">
+                            <span>{projectModes[mode].badge}</span>
+                            <span>
+                              {mode === "image"
+                                ? isImageCameraOn
+                                  ? "실시간 카메라 연결"
+                                  : "카메라 대기 중"
+                                : isPoseCameraOn
+                                  ? "테스트 추적 중"
+                                  : "테스트 대기 중"}
+                            </span>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  </section>
+                )}
                 <div className="simple-flow-grid">
                   <article className="simple-step-card">
                     <div className="simple-step-number">1</div>
@@ -2347,14 +2441,14 @@ export default function App() {
 
                   <article className="simple-step-card">
                     <div className="simple-step-number">2</div>
-                    <strong>카메라와 수집</strong>
-                    <p>카메라를 켜고 태스크별로 에피소드 클립을 수집합니다.</p>
+                    <strong>클립 수집</strong>
+                    <p>위 카메라 화면을 확인한 뒤 태스크별로 에피소드 클립을 수집합니다.</p>
                     <div className="robot-toolbar">
-                      <button className="secondary-button" disabled={isModelLoading} onClick={() => void prepareCurrentMode()} type="button">
-                        {isModelLoading ? "준비 중..." : inputButtonLabel}
-                      </button>
                       <button className="secondary-button" onClick={() => addClass(mode)} type="button">
                         태스크 추가
+                      </button>
+                      <button className="secondary-button" onClick={() => triggerUpload(0)} type="button" disabled={!currentClassNames.length}>
+                        파일 업로드
                       </button>
                     </div>
                     <div className="simple-task-list">

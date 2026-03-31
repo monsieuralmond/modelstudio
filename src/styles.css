@@ -1301,11 +1301,49 @@ h3 {
   gap: 18px;
 }
 
+.simple-intro-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at right top, rgba(113, 167, 255, 0.16), transparent 32%),
+    rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+}
+
+.simple-intro-band strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1.04rem;
+}
+
+.simple-intro-band p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.simple-intro-actions {
+  display: flex;
+  align-items: center;
+}
+
 .simple-summary-grid,
 .simple-agent-status {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.simple-summary-grid .summary-card,
+.simple-agent-status .summary-card {
+  min-height: 110px;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
 }
 
 .simple-flow-grid {
@@ -1314,13 +1352,23 @@ h3 {
   gap: 18px;
 }
 
+.simple-camera-panel {
+  padding: 22px;
+}
+
+.simple-camera-layout {
+  grid-template-columns: 1fr;
+}
+
 .simple-step-card {
   display: grid;
   gap: 14px;
   padding: 22px;
   border-radius: 22px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background:
+    radial-gradient(circle at top right, rgba(113, 167, 255, 0.08), transparent 28%),
+    rgba(255, 255, 255, 0.04);
 }
 
 .simple-step-number {
@@ -1382,6 +1430,10 @@ h3 {
 
 .simple-job-box p {
   margin: 0;
+}
+
+.simple-audio-stage {
+  min-height: 260px;
 }
 
 .ai-agent-panel {
@@ -1599,6 +1651,10 @@ h3 {
   .simple-summary-grid,
   .simple-agent-status,
   .simple-flow-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .simple-intro-band {
     grid-template-columns: 1fr;
   }
 }
