@@ -1291,6 +1291,123 @@ h3 {
   margin-top: 22px;
 }
 
+.ai-agent-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.agent-socket-badge {
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.agent-socket-badge.open {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.agent-socket-badge.connecting,
+.agent-socket-badge.closed {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.agent-panel-copy {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+}
+
+.agent-panel-copy strong,
+.agent-log-item p,
+.agent-error-box,
+.agent-result-box pre {
+  color: var(--text);
+}
+
+.agent-panel-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.agent-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agent-toolbar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.agent-result-box {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-result-box pre {
+  margin: 0;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(4, 10, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: auto;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.agent-error-box {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.18);
+}
+
+.agent-log-list {
+  display: grid;
+  gap: 12px;
+}
+
+.agent-log-item {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.agent-log-item.agent {
+  background: rgba(113, 167, 255, 0.1);
+}
+
+.agent-log-item.tool {
+  background: rgba(79, 211, 161, 0.08);
+}
+
+.agent-log-item.error {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.agent-log-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.agent-log-item p {
+  margin: 0;
+  line-height: 1.55;
+}
+
 .info-panel {
   padding: 24px;
 }
@@ -1383,7 +1500,9 @@ h3 {
   .task-config-grid,
   .class-list,
   .prediction-list,
-  .task-clip-grid {
+  .task-clip-grid,
+  .agent-summary-grid,
+  .agent-toolbar {
     grid-template-columns: 1fr;
   }
 }
