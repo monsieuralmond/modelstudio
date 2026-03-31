@@ -7,6 +7,9 @@ const STORAGE_KEY = "model-studio-project-v2";
 const IMAGE_MODEL_KEY = "indexeddb://model-studio-image-classifier";
 const POSE_MODEL_KEY = "indexeddb://model-studio-pose-classifier";
 const BRIDGE_URL_KEY = "lerobot-bridge-url";
+const AGENT_API_BASE_URL =
+  import.meta.env.VITE_AGENT_API_BASE_URL || "https://robot-agent-backend.onrender.com";
+const AGENT_WS_URL = AGENT_API_BASE_URL.replace(/^http/, "ws");
 
 const projectModes = {
   image: {
@@ -66,6 +69,26 @@ const trainingSettings = {
   minSamples: 9,
   captureIntervalMs: 180,
   previewIntervalMs: 240,
+};
+
+const defaultAgentState = {
+  data_count: 0,
+  target_data: 100,
+  loss: 1.0,
+  target_loss: 0.1,
+  iteration: 0,
+  max_iteration: 10,
+};
+
+const emptyAgentStatus = {
+  state: defaultAgentState,
+  mode: "idle",
+  done: false,
+  current_action: null,
+  logs: [],
+  last_tool_result: {},
+  session_name: "default-session",
+  error: null,
 };
 
 export default function App() {
@@ -156,6 +179,12 @@ export default function App() {
     message: "로컬 로봇 제어 브리지를 확인하는 중입니다.",
     toolRoot: "/Users/almond/feetech-servo-tool",
   });
+  const [agentSessionName, setAgentSessionName] = useState("default-session");
+  const [agentState, setAgentState] = useState(defaultAgentState);
+  const [agentStatus, setAgentStatus] = useState(emptyAgentStatus);
+  const [agentError, setAgentError] = useState("");
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentSocketState, setAgentSocketState] = useState("connecting");
 
   const imageVideoRef = useRef(null);
   const poseVideoRef = useRef(null);
@@ -201,6 +230,13 @@ export default function App() {
       : totalSamples >= trainingSettings.minSamples
       ? "학습 가능"
       : `${trainingSettings.minSamples - totalSamples}개 샘플 더 필요`;
+  const isAgentRunning = agentStatus.mode === "running";
+  const agentSummary = [
+    { label: "Data", value: `${agentStatus.state.data_count} / ${agentStatus.state.target_data}` },
+    { label: "Loss", value: `${agentStatus.state.loss.toFixed(4)} / ${agentStatus.state.target_loss}` },
+    { label: "Iteration", value: `${agentStatus.state.iteration} / ${agentStatus.state.max_iteration}` },
+    { label: "Mode", value: agentStatus.mode },
+  ];
 
   useEffect(() => {
     return () => {
@@ -216,6 +252,42 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const socket = new window.WebSocket(`${AGENT_WS_URL}/agent/ws`);
+    setAgentSocketState("connecting");
+
+    socket.onopen = () => setAgentSocketState("open");
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === "status") {
+          setAgentStatus(payload.status);
+          setAgentSessionName(payload.status.session_name);
+          setAgentState(payload.status.state);
+          setAgentError(payload.status.error || "");
+        }
+      } catch (error) {
+        setAgentError("AI 에이전트 상태를 읽는 중 문제가 생겼습니다.");
+      }
+    };
+    socket.onerror = () => setAgentSocketState("closed");
+    socket.onclose = () => setAgentSocketState("closed");
+
+    return () => socket.close();
+  }, []);
+
+  useEffect(() => {
+    if (agentSocketState === "open") {
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      void refreshAgentStatus();
+    }, 4000);
+
+    return () => window.clearInterval(interval);
+  }, [agentSocketState]);
+
+  useEffect(() => {
     stopPreview();
     stopImageCaptureLoop();
     stopPoseCaptureLoop();
@@ -228,6 +300,88 @@ export default function App() {
       stopPoseCamera();
     }
   }, [mode]);
+
+  async function fetchAgentJson(path, options = {}) {
+    const response = await fetch(`${AGENT_API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.detail || "AI 에이전트 요청에 실패했습니다.");
+    }
+    return data;
+  }
+
+  async function refreshAgentStatus() {
+    try {
+      const data = await fetchAgentJson("/agent/status");
+      setAgentStatus(data.status);
+      setAgentSessionName(data.status.session_name);
+      setAgentState(data.status.state);
+      setAgentError(data.status.error || "");
+    } catch (error) {
+      setAgentError(error.message);
+      setAgentSocketState("closed");
+    }
+  }
+
+  function updateAgentState(key, value) {
+    setAgentState((current) => ({ ...current, [key]: value }));
+  }
+
+  function syncAgentFromProject() {
+    setAgentSessionName(projectName.trim() || "lerobot-session");
+    setAgentState((current) => ({
+      ...current,
+      data_count: totalSamples,
+      target_data: Math.max(current.target_data, totalSamples || 100),
+    }));
+    setAgentError("");
+  }
+
+  async function startAgentLoop() {
+    setAgentBusy(true);
+    setAgentError("");
+    try {
+      const data = await fetchAgentJson("/agent/start", {
+        method: "POST",
+        body: JSON.stringify({
+          session_name: agentSessionName,
+          state: agentState,
+          training_config: {
+            epochs: 3,
+            batch_size: 16,
+            learning_rate: 0.0005,
+          },
+        }),
+      });
+      setAgentStatus(data.status);
+    } catch (error) {
+      setAgentError(error.message);
+    } finally {
+      setAgentBusy(false);
+    }
+  }
+
+  async function stopAgentLoop() {
+    setAgentBusy(true);
+    setAgentError("");
+    try {
+      const data = await fetchAgentJson("/agent/stop", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setAgentStatus(data.status);
+    } catch (error) {
+      setAgentError(error.message);
+    } finally {
+      setAgentBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (mode !== "image" || !isPreviewRunning || !trainedByMode.image) {
@@ -2341,6 +2495,126 @@ export default function App() {
             </div>
 
             <aside className="sidebar">
+              <section className="panel ai-agent-panel">
+                <div className="panel-header">
+                  <div>
+                    <p className="mini-label">AI Agent</p>
+                    <h3>학습 파이프라인 코치</h3>
+                  </div>
+                  <div className={`agent-socket-badge ${agentSocketState}`}>
+                    {agentSocketState === "open" ? "Live" : "Polling"}
+                  </div>
+                </div>
+
+                <div className="agent-panel-copy">
+                  <strong>지금 수집할지, 학습할지 AI가 판단합니다.</strong>
+                  <p>현재 프로젝트 샘플 수를 상태에 반영하고, 반복 루프를 실행해 데이터 수집과 재학습 여부를 자동으로 결정합니다.</p>
+                </div>
+
+                <div className="agent-summary-grid">
+                  {agentSummary.map((item) => (
+                    <div className="summary-card" key={item.label}>
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="robot-panel-grid">
+                  <label className="bridge-field">
+                    <span>세션 이름</span>
+                    <input onChange={(event) => setAgentSessionName(event.target.value)} type="text" value={agentSessionName} />
+                  </label>
+                  <label className="bridge-field">
+                    <span>현재 데이터</span>
+                    <input
+                      onChange={(event) => updateAgentState("data_count", Number(event.target.value))}
+                      type="number"
+                      value={agentState.data_count}
+                    />
+                  </label>
+                  <label className="bridge-field">
+                    <span>목표 데이터</span>
+                    <input
+                      onChange={(event) => updateAgentState("target_data", Number(event.target.value))}
+                      type="number"
+                      value={agentState.target_data}
+                    />
+                  </label>
+                  <label className="bridge-field">
+                    <span>현재 loss</span>
+                    <input
+                      onChange={(event) => updateAgentState("loss", Number(event.target.value))}
+                      step="0.01"
+                      type="number"
+                      value={agentState.loss}
+                    />
+                  </label>
+                  <label className="bridge-field">
+                    <span>목표 loss</span>
+                    <input
+                      onChange={(event) => updateAgentState("target_loss", Number(event.target.value))}
+                      step="0.01"
+                      type="number"
+                      value={agentState.target_loss}
+                    />
+                  </label>
+                  <label className="bridge-field">
+                    <span>최대 반복</span>
+                    <input
+                      onChange={(event) => updateAgentState("max_iteration", Number(event.target.value))}
+                      type="number"
+                      value={agentState.max_iteration}
+                    />
+                  </label>
+                </div>
+
+                <div className="robot-toolbar agent-toolbar">
+                  <button className="secondary-button" onClick={syncAgentFromProject} type="button">
+                    현재 프로젝트로 채우기
+                  </button>
+                  <button className="secondary-button" onClick={() => void refreshAgentStatus()} type="button">
+                    상태 새로고침
+                  </button>
+                  <button className="primary-button" disabled={agentBusy || isAgentRunning} onClick={() => void startAgentLoop()} type="button">
+                    {agentBusy && !isAgentRunning ? "시작 중..." : "AI 루프 시작"}
+                  </button>
+                  <button className="ghost-button" disabled={agentBusy || !isAgentRunning} onClick={() => void stopAgentLoop()} type="button">
+                    루프 중지
+                  </button>
+                </div>
+
+                <div className="agent-result-box">
+                  <p className="mini-label">최근 도구 결과</p>
+                  <pre>{JSON.stringify(agentStatus.last_tool_result, null, 2)}</pre>
+                </div>
+
+                {(agentError || agentStatus.error) && (
+                  <div className="agent-error-box">
+                    {agentError || agentStatus.error}
+                  </div>
+                )}
+
+                <div className="agent-log-list">
+                  {agentStatus.logs.length ? (
+                    agentStatus.logs.slice(-6).map((entry) => (
+                      <article className={`agent-log-item ${entry.actor}`} key={`agent-log-${entry.step}`}>
+                        <div className="agent-log-meta">
+                          <span>{entry.actor}</span>
+                          <span>step {entry.step}</span>
+                        </div>
+                        <p>{entry.message}</p>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="workspace-empty compact">
+                      <strong>아직 AI 에이전트 로그가 없습니다.</strong>
+                      <p>루프를 시작하면 수집, 학습, 재학습 판단이 이 영역에 표시됩니다.</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
               <section className="panel">
                 <div className="panel-header">
                   <div>
