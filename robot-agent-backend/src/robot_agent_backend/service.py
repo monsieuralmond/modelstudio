@@ -115,6 +115,10 @@ class AgentOrchestrator:
                 self.status.current_action = None
                 self._append_log("system", "Reached max iteration safety limit.")
                 snapshot = self.status.model_copy(deep=True)
+                should_stop = True
+            else:
+                should_stop = False
+        if should_stop:
             await self.broadcaster.broadcast_status(snapshot)
             return
 
