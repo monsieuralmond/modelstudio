@@ -13,12 +13,11 @@ const AGENT_WS_URL = AGENT_API_BASE_URL.replace(/^http/, "ws");
 
 const projectModes = {
   image: {
-    title: "LeRobot 카메라 학습",
+    title: "LeRobot 학습",
     badge: "비전",
     subtitle: "로봇에 연결된 카메라 화면으로 태스크별 에피소드를 기록합니다.",
-    description:
-      "로봇 카메라 피드를 연결하고 태스크별 episode를 기록한 뒤, 브라우저에서 바로 학습하고 예측 결과를 테스트합니다.",
-    helper: "로봇 카메라를 켠 뒤 태스크별로 몇 초 동안 몇 회 기록할지 정하고 에피소드를 모아보세요.",
+    description: "",
+    helper: "",
     previewLabel: "로봇 카메라 피드",
     inputAction: "카메라 연결",
     trainingBadge: "LeRobot 비전 학습",
@@ -2250,7 +2249,9 @@ export default function App() {
             <div>
               <p className="eyebrow">플랫폼</p>
               <h2>{projectModes[mode].title}</h2>
-              <p className="section-copy">{projectModes[mode].description}</p>
+              {projectModes[mode].description ? (
+                <p className="section-copy">{projectModes[mode].description}</p>
+              ) : null}
             </div>
             <div className="header-tools">
               <label className="project-name">
@@ -2274,21 +2275,13 @@ export default function App() {
                   onClick={() => setStudioView("developer")}
                   type="button"
                 >
-                  개발자 화면
+                  개발자 모드
                 </button>
                 <button className="secondary-button" onClick={saveProject} type="button">
                   저장
                 </button>
                 <button className="secondary-button" onClick={() => void loadSavedProject()} type="button">
                   불러오기
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!servoToolState.bridgeOnline}
-                  onClick={() => void launchServoTool()}
-                  type="button"
-                >
-                  LeRobot 실행
                 </button>
                 <button className="primary-button" onClick={() => void exportCurrentMode()} type="button">
                   내보내기
@@ -2307,21 +2300,10 @@ export default function App() {
               <section className="panel simple-hero-panel">
                 <div className="panel-header">
                   <div>
-                    <p className="mini-label">빠른 시작</p>
-                    <h3>연결하고, 수집하고, GPU로 학습하기</h3>
+                    <p className="mini-label">메인 화면</p>
+                    <h3>연결, 수집, GPU 학습</h3>
                   </div>
                   <span className="status-pill">{projectModes[mode].badge}</span>
-                </div>
-                <div className="simple-intro-band">
-                  <div>
-                    <strong>초보자는 이 순서만 따라가면 됩니다.</strong>
-                    <p>로봇 연결, 카메라 확인, 클립 수집, GPU 학습 시작까지 필요한 기능만 앞에 배치했습니다.</p>
-                  </div>
-                  <div className="simple-intro-actions">
-                    <button className="secondary-button" onClick={() => setStudioView("developer")} type="button">
-                      개발자 화면 열기
-                    </button>
-                  </div>
                 </div>
                 <div className="simple-summary-grid">
                   <div className="summary-card">
@@ -2403,7 +2385,7 @@ export default function App() {
                             <div className="camera-placeholder">
                               <div className="camera-placeholder-copy">
                                 <strong>{projectModes[mode].previewLabel}</strong>
-                                <p>{projectModes[mode].helper}</p>
+                                {projectModes[mode].helper ? <p>{projectModes[mode].helper}</p> : null}
                               </div>
                             </div>
                           )}
@@ -2428,7 +2410,7 @@ export default function App() {
                   <article className="simple-step-card">
                     <div className="simple-step-number">1</div>
                     <strong>로봇 연결</strong>
-                    <p>포트를 감지하고 자동 연결을 시도합니다. 초보자는 이 버튼만 누르면 됩니다.</p>
+                    <p>포트를 감지하고 자동 연결을 시도합니다.</p>
                     <div className="robot-toolbar">
                       <button className="secondary-button" onClick={() => void loadRobotPorts()} type="button">
                         포트 찾기
@@ -2439,50 +2421,153 @@ export default function App() {
                     </div>
                   </article>
 
-                  <article className="simple-step-card">
-                    <div className="simple-step-number">2</div>
-                    <strong>클립 수집</strong>
-                    <p>위 카메라 화면을 확인한 뒤 태스크별로 에피소드 클립을 수집합니다.</p>
-                    <div className="robot-toolbar">
-                      <button className="secondary-button" onClick={() => addClass(mode)} type="button">
-                        태스크 추가
-                      </button>
-                      <button className="secondary-button" onClick={() => triggerUpload(0)} type="button" disabled={!currentClassNames.length}>
-                        파일 업로드
-                      </button>
+                  <section className="panel workspace-class-panel simple-task-panel">
+                    <div className="panel-header">
+                      <div>
+                        <p className="mini-label">태스크 / 에피소드</p>
+                        <h3>수집 태스크</h3>
+                      </div>
+                      <div className="class-panel-actions">
+                        <button className="add-class-button" onClick={() => addClass(mode)} type="button">
+                          + 태스크 추가
+                        </button>
+                        <button className="text-button" onClick={resetCurrentMode} type="button">
+                          초기화
+                        </button>
+                      </div>
                     </div>
-                    <div className="simple-task-list">
-                      {currentClassNames.length ? (
-                        currentClassNames.map((label, index) => (
-                          <div className="simple-task-item" key={`simple-task-${mode}-${index}`}>
-                            <div>
-                              <strong>{label}</strong>
-                              <span>{currentSampleCounts[index]}개 샘플 · {clipLibraryByMode[mode].filter((clip) => clip.taskIndex === index).length}개 클립</span>
-                            </div>
-                            {mode === "audio" ? (
-                              <button className="secondary-button" disabled={isTraining} onClick={() => void captureAudioSample(index)} type="button">
-                                샘플 녹음
-                              </button>
-                            ) : (
-                              <button
-                                className="primary-button"
-                                disabled={(mode === "image" && !isImageCameraOn) || (mode === "pose" && !isPoseCameraOn)}
-                                onClick={() => (mode === "image" ? handleImageClassButtonClick(index) : handlePoseClassButtonClick(index))}
-                                type="button"
-                              >
-                                클립 기록
-                              </button>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="workspace-empty compact">
-                          <strong>아직 태스크가 없습니다.</strong>
-                          <p>먼저 태스크를 하나 만들고 카메라를 켠 뒤 클립을 모아보세요.</p>
+
+                    {currentClassNames.length ? (
+                      <>
+                        <div className="class-list">
+                          {currentClassNames.map((label, index) => {
+                            const taskConfig = getTaskConfig(mode, index);
+                            const taskClips = clipLibraryByMode[mode].filter((clip) => clip.taskIndex === index);
+
+                            return (
+                              <article className={`class-card ${classTones[index % classTones.length]}`} key={`simple-${mode}-${index}`}>
+                                <div className="class-meta">
+                                  <div>
+                                    <strong>{`태스크 ${index + 1}`}</strong>
+                                    <input
+                                      className="class-name-input"
+                                      onChange={(event) => updateClassName(mode, index, event.target.value)}
+                                      type="text"
+                                      value={label}
+                                    />
+                                  </div>
+                                  <em>{currentSampleCounts[index]}개 샘플</em>
+                                </div>
+
+                                {mode !== "audio" && (
+                                  <div className="task-config-grid">
+                                    <label className="bridge-field">
+                                      <span>기록 길이(초)</span>
+                                      <input
+                                        min="1"
+                                        onChange={(event) =>
+                                          updateTaskConfig(mode, index, "durationSeconds", event.target.value)
+                                        }
+                                        type="number"
+                                        value={taskConfig.durationSeconds}
+                                      />
+                                    </label>
+                                    <label className="bridge-field">
+                                      <span>반복 횟수</span>
+                                      <input
+                                        min="1"
+                                        onChange={(event) =>
+                                          updateTaskConfig(mode, index, "repeatCount", event.target.value)
+                                        }
+                                        type="number"
+                                        value={taskConfig.repeatCount}
+                                      />
+                                    </label>
+                                  </div>
+                                )}
+
+                                <div className="class-card-actions">
+                                  {mode === "audio" ? (
+                                    <button
+                                      className={`record-button ${classTones[index % classTones.length]}`}
+                                      disabled={isTraining}
+                                      onClick={() => void captureAudioSample(index)}
+                                      type="button"
+                                    >
+                                      샘플 1개 녹음
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        className={`record-button ${classTones[index % classTones.length]}`}
+                                        disabled={
+                                          isTraining ||
+                                          (mode === "image" && !isImageCameraOn) ||
+                                          (mode === "pose" && !isPoseCameraOn)
+                                        }
+                                        onClick={() =>
+                                          mode === "image"
+                                            ? handleImageClassButtonClick(index)
+                                            : handlePoseClassButtonClick(index)
+                                        }
+                                        type="button"
+                                      >
+                                        에피소드 기록
+                                      </button>
+                                      <button className="upload-button" onClick={() => triggerUpload(index)} type="button">
+                                        파일 업로드
+                                      </button>
+                                    </>
+                                  )}
+                                  {mode === "audio" && (
+                                    <button className="upload-button" disabled type="button">
+                                      파일 업로드 준비중
+                                    </button>
+                                  )}
+                                  <button className="remove-class-button" onClick={() => removeClass(mode, index)} type="button">
+                                    태스크 삭제
+                                  </button>
+                                </div>
+
+                                <div className="task-clip-group">
+                                  <div className="task-clip-group-header">
+                                    <strong>에피소드 클립</strong>
+                                    <span>{taskClips.length}개</span>
+                                  </div>
+                                  {taskClips.length ? (
+                                    <div className="task-clip-grid">
+                                      {taskClips.map((clip) => (
+                                        <article className="clip-card compact" key={`simple-clip-${clip.createdAt}-${clip.taskIndex}-${clip.episodeIndex}`}>
+                                          <img alt={clip.taskName} src={clip.thumbnail} />
+                                          <div className="clip-card-body">
+                                            <strong>{`Episode ${clip.episodeIndex}`}</strong>
+                                            <span>{clip.duration}초 기록</span>
+                                            <span>{clip.sampleCount ?? 0} 프레임</span>
+                                            <span>{clip.metricsLog?.length ?? 0}개 상태 포인트</span>
+                                            <span>{clip.controlLog?.length ?? 0}개 제어 로그</span>
+                                          </div>
+                                        </article>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="workspace-empty compact">
+                                      <strong>아직 기록된 에피소드가 없습니다.</strong>
+                                      <p>이 태스크의 길이와 반복 횟수를 정한 뒤 기록을 시작하세요.</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </article>
+                            );
+                          })}
                         </div>
-                      )}
-                    </div>
-                  </article>
+                      </>
+                    ) : (
+                      <div className="workspace-empty">
+                        <strong>아직 만든 태스크가 없습니다.</strong>
+                        <p>`+ 태스크 추가` 버튼으로 원하는 만큼 수집 태스크를 만들어보세요.</p>
+                      </div>
+                    )}
+                  </section>
 
                   <article className="simple-step-card">
                     <div className="simple-step-number">3</div>
