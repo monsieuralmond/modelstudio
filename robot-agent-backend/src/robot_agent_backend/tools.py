@@ -17,7 +17,7 @@ class RobotTools:
         self._last_training_status: dict[str, Any] = {
             "status": "idle",
             "progress": 0,
-            "message": "No training has started yet.",
+            "message": "아직 학습이 시작되지 않았습니다.",
         }
 
     def collect_data(self, session_name: str, count: int, state: AgentState) -> dict[str, Any]:
@@ -35,7 +35,7 @@ class RobotTools:
             self._last_training_status = {
                 "status": "data_collection",
                 "progress": result.get("progress", 100),
-                "message": result.get("message", f"Collected {collected} samples."),
+                "message": result.get("message", f"샘플 {collected}개를 수집했습니다."),
             }
             return result
 
@@ -44,7 +44,7 @@ class RobotTools:
         self._last_training_status = {
             "status": "data_collection",
             "progress": 100,
-            "message": f"Collected {collected} samples for session '{session_name}'.",
+            "message": f"세션 '{session_name}'에 샘플 {collected}개를 수집했습니다.",
         }
         return {
             "session_name": session_name,
@@ -65,7 +65,7 @@ class RobotTools:
             self._last_training_status = {
                 "status": result.get("status", "completed"),
                 "progress": result.get("progress", 100),
-                "message": result.get("message", "Training completed successfully."),
+                "message": result.get("message", "학습이 성공적으로 끝났습니다."),
             }
             return result
 
@@ -74,7 +74,7 @@ class RobotTools:
         self._last_training_status = {
             "status": "completed",
             "progress": 100,
-            "message": "Training completed successfully.",
+            "message": "학습이 성공적으로 끝났습니다.",
         }
         return {
             "config": config,
@@ -89,7 +89,7 @@ class RobotTools:
             self._last_training_status = {
                 "status": result.get("status", "unknown"),
                 "progress": result.get("progress", 0),
-                "message": result.get("message", "External status script returned."),
+                "message": result.get("message", "외부 상태 스크립트 결과를 받았습니다."),
             }
             return result
         return dict(self._last_training_status)
@@ -109,4 +109,4 @@ class RobotTools:
         try:
             return json.loads(stdout)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Script {script} must output JSON. Got: {stdout}") from exc
+            raise ValueError(f"스크립트 {script}는 JSON을 출력해야 합니다. 실제 출력: {stdout}") from exc
