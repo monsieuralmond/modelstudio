@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "servo-bridge": "node servo-bridge.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
