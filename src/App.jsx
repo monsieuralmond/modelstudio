@@ -106,8 +106,16 @@ const agentActorLabels = {
   error: "오류",
 };
 
+const gpuJobStateLabels = {
+  queued: "대기 중",
+  running: "학습 중",
+  completed: "완료",
+  error: "오류",
+};
+
 export default function App() {
   const [mode, setMode] = useState("image");
+  const [studioView, setStudioView] = useState("simple");
   const [isStudioOpen, setIsStudioOpen] = useState(false);
   const [projectName, setProjectName] = useState("AI Robot Studio 데모");
   const [classNamesByMode, setClassNamesByMode] = useState(defaultClassNames);
@@ -200,6 +208,9 @@ export default function App() {
   const [agentError, setAgentError] = useState("");
   const [agentBusy, setAgentBusy] = useState(false);
   const [agentSocketState, setAgentSocketState] = useState("connecting");
+  const [gpuJobs, setGpuJobs] = useState([]);
+  const [gpuBusy, setGpuBusy] = useState(false);
+  const [gpuError, setGpuError] = useState("");
 
   const imageVideoRef = useRef(null);
   const poseVideoRef = useRef(null);
@@ -246,12 +257,15 @@ export default function App() {
       ? "학습 가능"
       : `${trainingSettings.minSamples - totalSamples}개 샘플 더 필요`;
   const isAgentRunning = agentStatus.mode === "running";
+  const latestGpuJob = gpuJobs[0] || null;
   const agentSummary = [
     { label: "데이터", value: `${agentStatus.state.data_count} / ${agentStatus.state.target_data}` },
     { label: "손실값", value: `${agentStatus.state.loss.toFixed(4)} / ${agentStatus.state.target_loss}` },
     { label: "반복", value: `${agentStatus.state.iteration} / ${agentStatus.state.max_iteration}` },
     { label: "상태", value: agentModeLabels[agentStatus.mode] || agentStatus.mode },
   ];
+  const currentClipCount = clipLibraryByMode[mode].length;
+  const currentTaskCount = currentClassNames.length;
 
   useEffect(() => {
     return () => {
@@ -288,6 +302,16 @@ export default function App() {
     socket.onclose = () => setAgentSocketState("closed");
 
     return () => socket.close();
+  }, []);
+
+  useEffect(() => {
+    void refreshGpuJobs();
+
+    const interval = window.setInterval(() => {
+      void refreshGpuJobs();
+    }, 5000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -344,6 +368,16 @@ export default function App() {
     }
   }
 
+  async function refreshGpuJobs() {
+    try {
+      const data = await fetchAgentJson("/gpu/jobs");
+      setGpuJobs(data.jobs || []);
+      setGpuError("");
+    } catch (error) {
+      setGpuError(error.message || "GPU 작업 상태를 읽지 못했습니다.");
+    }
+  }
+
   function updateAgentState(key, value) {
     setAgentState((current) => ({ ...current, [key]: value }));
   }
@@ -395,6 +429,45 @@ export default function App() {
       setAgentError(error.message || "AI 에이전트 요청 중 문제가 생겼습니다.");
     } finally {
       setAgentBusy(false);
+    }
+  }
+
+  function buildDatasetSummary() {
+    return {
+      mode,
+      project_name: projectName,
+      task_names: currentClassNames,
+      sample_counts: currentSampleCounts,
+      clip_count: currentClipCount,
+      has_raw_episodes: currentClipCount > 0,
+      notes:
+        currentClipCount > 0
+          ? "현재는 브라우저에 저장된 클립 메타데이터 기준입니다. 이후 원본 episode 업로드 파이프라인을 연결할 수 있습니다."
+          : "아직 수집된 클립이 없습니다.",
+    };
+  }
+
+  async function submitGpuTrainingJob() {
+    setGpuBusy(true);
+    setGpuError("");
+    try {
+      const data = await fetchAgentJson("/gpu/train", {
+        method: "POST",
+        body: JSON.stringify({
+          session_name: projectName.trim() || "lerobot-gpu-session",
+          dataset: buildDatasetSummary(),
+          training_config: {
+            provider: "vessl",
+            project: projectName.trim() || "lerobot-gpu-session",
+            epochs: 10,
+          },
+        }),
+      });
+      setGpuJobs((current) => [data.job, ...current.filter((item) => item.job_id !== data.job.job_id)]);
+    } catch (error) {
+      setGpuError(error.message || "GPU 학습 요청에 실패했습니다.");
+    } finally {
+      setGpuBusy(false);
     }
   }
 
@@ -2000,9 +2073,10 @@ export default function App() {
     });
   }
 
-  function openStudio(nextMode = mode) {
+  function openStudio(nextMode = mode, nextView = "simple") {
     startTransition(() => {
       setMode(nextMode);
+      setStudioView(nextView);
       setIsStudioOpen(true);
     });
   }
@@ -2158,8 +2232,11 @@ export default function App() {
               <span>LeRobot</span>
             </h1>
             <div className="hero-actions">
-              <button className="primary-button" onClick={() => openStudio("image")} type="button">
-                시작하기
+              <button className="primary-button" onClick={() => openStudio("image", "simple")} type="button">
+                바로 시작하기
+              </button>
+              <button className="secondary-button" onClick={() => openStudio("image", "developer")} type="button">
+                개발자 모드
               </button>
             </div>
           </div>
@@ -2185,6 +2262,20 @@ export default function App() {
                 />
               </label>
               <div className="header-actions">
+                <button
+                  className={`toggle-button ${studioView === "simple" ? "active" : ""}`}
+                  onClick={() => setStudioView("simple")}
+                  type="button"
+                >
+                  메인 화면
+                </button>
+                <button
+                  className={`toggle-button ${studioView === "developer" ? "active" : ""}`}
+                  onClick={() => setStudioView("developer")}
+                  type="button"
+                >
+                  개발자 화면
+                </button>
                 <button className="secondary-button" onClick={saveProject} type="button">
                   저장
                 </button>
@@ -2211,6 +2302,151 @@ export default function App() {
 
           <div className="save-message">{saveMessage}</div>
 
+          {studioView === "simple" ? (
+            <div className="simple-layout">
+              <section className="panel simple-hero-panel">
+                <div className="panel-header">
+                  <div>
+                    <p className="mini-label">빠른 시작</p>
+                    <h3>연결하고, 수집하고, GPU로 학습하기</h3>
+                  </div>
+                  <span className="status-pill">{projectModes[mode].badge}</span>
+                </div>
+                <div className="simple-summary-grid">
+                  <div className="summary-card">
+                    <span>연결 상태</span>
+                    <strong>{robotConnection ? "로봇 연결됨" : "연결 전"}</strong>
+                  </div>
+                  <div className="summary-card">
+                    <span>수집된 클립</span>
+                    <strong>{currentClipCount}개</strong>
+                  </div>
+                  <div className="summary-card">
+                    <span>태스크 수</span>
+                    <strong>{currentTaskCount}개</strong>
+                  </div>
+                  <div className="summary-card">
+                    <span>GPU 학습 상태</span>
+                    <strong>{latestGpuJob ? gpuJobStateLabels[latestGpuJob.state] || latestGpuJob.state : "아직 없음"}</strong>
+                  </div>
+                </div>
+                <div className="simple-flow-grid">
+                  <article className="simple-step-card">
+                    <div className="simple-step-number">1</div>
+                    <strong>로봇 연결</strong>
+                    <p>포트를 감지하고 자동 연결을 시도합니다. 초보자는 이 버튼만 누르면 됩니다.</p>
+                    <div className="robot-toolbar">
+                      <button className="secondary-button" onClick={() => void loadRobotPorts()} type="button">
+                        포트 찾기
+                      </button>
+                      <button className="primary-button" onClick={() => void autoConnectRobot()} type="button">
+                        연결하기
+                      </button>
+                    </div>
+                  </article>
+
+                  <article className="simple-step-card">
+                    <div className="simple-step-number">2</div>
+                    <strong>카메라와 수집</strong>
+                    <p>카메라를 켜고 태스크별로 에피소드 클립을 수집합니다.</p>
+                    <div className="robot-toolbar">
+                      <button className="secondary-button" disabled={isModelLoading} onClick={() => void prepareCurrentMode()} type="button">
+                        {isModelLoading ? "준비 중..." : inputButtonLabel}
+                      </button>
+                      <button className="secondary-button" onClick={() => addClass(mode)} type="button">
+                        태스크 추가
+                      </button>
+                    </div>
+                    <div className="simple-task-list">
+                      {currentClassNames.length ? (
+                        currentClassNames.map((label, index) => (
+                          <div className="simple-task-item" key={`simple-task-${mode}-${index}`}>
+                            <div>
+                              <strong>{label}</strong>
+                              <span>{currentSampleCounts[index]}개 샘플 · {clipLibraryByMode[mode].filter((clip) => clip.taskIndex === index).length}개 클립</span>
+                            </div>
+                            {mode === "audio" ? (
+                              <button className="secondary-button" disabled={isTraining} onClick={() => void captureAudioSample(index)} type="button">
+                                샘플 녹음
+                              </button>
+                            ) : (
+                              <button
+                                className="primary-button"
+                                disabled={(mode === "image" && !isImageCameraOn) || (mode === "pose" && !isPoseCameraOn)}
+                                onClick={() => (mode === "image" ? handleImageClassButtonClick(index) : handlePoseClassButtonClick(index))}
+                                type="button"
+                              >
+                                클립 기록
+                              </button>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="workspace-empty compact">
+                          <strong>아직 태스크가 없습니다.</strong>
+                          <p>먼저 태스크를 하나 만들고 카메라를 켠 뒤 클립을 모아보세요.</p>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+
+                  <article className="simple-step-card">
+                    <div className="simple-step-number">3</div>
+                    <strong>외부 GPU 학습</strong>
+                    <p>브라우저 대신 외부 GPU로 학습 작업을 보내 VESSL 같은 환경에서 훈련할 수 있게 준비합니다.</p>
+                    <div className="robot-toolbar">
+                      <button className="secondary-button" onClick={syncAgentFromProject} type="button">
+                        프로젝트 상태 반영
+                      </button>
+                      <button className="primary-button" disabled={gpuBusy || currentClipCount === 0} onClick={() => void submitGpuTrainingJob()} type="button">
+                        {gpuBusy ? "전송 중..." : "GPU 학습 시작"}
+                      </button>
+                    </div>
+                    <div className="simple-job-box">
+                      {latestGpuJob ? (
+                        <>
+                          <strong>{gpuJobStateLabels[latestGpuJob.state] || latestGpuJob.state}</strong>
+                          <p>{latestGpuJob.message}</p>
+                        </>
+                      ) : (
+                        <>
+                          <strong>아직 GPU 작업이 없습니다.</strong>
+                          <p>클립을 수집한 뒤 GPU 학습 시작 버튼을 눌러보세요.</p>
+                        </>
+                      )}
+                    </div>
+                    {gpuError && <div className="agent-error-box">{gpuError}</div>}
+                  </article>
+
+                  <article className="simple-step-card">
+                    <div className="simple-step-number">4</div>
+                    <strong>결과 확인</strong>
+                    <p>AI 에이전트가 데이터가 충분한지, 더 수집해야 하는지 간단히 알려줍니다.</p>
+                    <div className="simple-agent-status">
+                      {agentSummary.map((item) => (
+                        <div className="summary-card" key={`simple-agent-${item.label}`}>
+                          <span>{item.label}</span>
+                          <strong>{item.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="simple-job-box">
+                      <strong>AI 안내</strong>
+                      <p>{agentStatus.logs[agentStatus.logs.length - 1]?.message || "아직 실행된 에이전트 로그가 없습니다."}</p>
+                    </div>
+                    <div className="robot-toolbar">
+                      <button className="secondary-button" onClick={() => void refreshAgentStatus()} type="button">
+                        안내 새로고침
+                      </button>
+                      <button className="primary-button" disabled={agentBusy || isAgentRunning} onClick={() => void startAgentLoop()} type="button">
+                        AI 판단 실행
+                      </button>
+                    </div>
+                  </article>
+                </div>
+              </section>
+            </div>
+          ) : (
           <div className="editor-layout">
             <div className="workspace">
               {mode === "audio" ? (
@@ -3067,6 +3303,7 @@ export default function App() {
               </section>
             </aside>
           </div>
+          )}
         </section>
         </section>
         </div>
