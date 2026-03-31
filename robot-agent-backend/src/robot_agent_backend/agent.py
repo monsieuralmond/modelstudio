@@ -8,20 +8,21 @@ from openai import OpenAI
 from .models import ActionType, AgentAction, AgentState
 
 
-SYSTEM_PROMPT = """You are an orchestration agent for a robot training pipeline.
-You must choose the next action based on pipeline state.
+SYSTEM_PROMPT = """너는 로봇 학습 파이프라인을 관리하는 오케스트레이션 에이전트다.
+현재 상태를 보고 다음 행동을 결정해야 한다.
 
-Rules:
-- If data_count < target_data, choose collect_data.
-- Else if loss > target_loss, choose start_training.
-- Else choose finish.
-- You may optionally choose get_training_status before training if useful, but only when it improves transparency.
-- Always return JSON only.
+규칙:
+- data_count < target_data 이면 collect_data를 선택한다.
+- 그렇지 않고 loss > target_loss 이면 start_training을 선택한다.
+- 둘 다 아니면 finish를 선택한다.
+- get_training_status는 상태를 더 분명하게 보여줄 필요가 있을 때만 선택한다.
+- reasoning은 반드시 한국어로 짧고 이해하기 쉽게 쓴다.
+- 출력은 반드시 JSON만 한다.
 
 JSON schema:
 {
   "type": "collect_data" | "start_training" | "get_training_status" | "finish",
-  "reasoning": "short operator-facing explanation",
+  "reasoning": "짧은 한국어 설명",
   "tool_input": {}
 }
 """
@@ -64,18 +65,18 @@ class RobotTrainingAgent:
             collect_count = min(remaining, max(10, remaining))
             return AgentAction(
                 type=ActionType.COLLECT_DATA,
-                reasoning="Data is insufficient, starting data collection.",
+                reasoning="데이터가 아직 부족해서 수집을 시작합니다.",
                 tool_input={"session_name": session_name, "count": collect_count},
             )
         if state.loss > state.target_loss:
             return AgentAction(
                 type=ActionType.START_TRAINING,
-                reasoning="Loss is too high, starting another training run.",
+                reasoning="손실값이 높아서 다시 학습을 시작합니다.",
                 tool_input={"config": training_config},
             )
         return AgentAction(
             type=ActionType.FINISH,
-            reasoning="Target data and target loss are satisfied. Finishing the pipeline.",
+            reasoning="목표 데이터와 목표 손실값을 만족해서 파이프라인을 마칩니다.",
             tool_input={},
         )
 
@@ -104,5 +105,5 @@ class RobotTrainingAgent:
         start = text.find("{")
         end = text.rfind("}")
         if start == -1 or end == -1 or end <= start:
-            raise ValueError("JSON response not found in model output.")
+            raise ValueError("모델 응답에서 JSON을 찾지 못했습니다.")
         return json.loads(text[start : end + 1])

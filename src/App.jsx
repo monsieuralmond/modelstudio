@@ -91,6 +91,21 @@ const emptyAgentStatus = {
   error: null,
 };
 
+const agentModeLabels = {
+  idle: "대기",
+  running: "실행 중",
+  stopped: "중지됨",
+  finished: "완료",
+  error: "오류",
+};
+
+const agentActorLabels = {
+  system: "시스템",
+  agent: "에이전트",
+  tool: "도구",
+  error: "오류",
+};
+
 export default function App() {
   const [mode, setMode] = useState("image");
   const [isStudioOpen, setIsStudioOpen] = useState(false);
@@ -232,10 +247,10 @@ export default function App() {
       : `${trainingSettings.minSamples - totalSamples}개 샘플 더 필요`;
   const isAgentRunning = agentStatus.mode === "running";
   const agentSummary = [
-    { label: "Data", value: `${agentStatus.state.data_count} / ${agentStatus.state.target_data}` },
-    { label: "Loss", value: `${agentStatus.state.loss.toFixed(4)} / ${agentStatus.state.target_loss}` },
-    { label: "Iteration", value: `${agentStatus.state.iteration} / ${agentStatus.state.max_iteration}` },
-    { label: "Mode", value: agentStatus.mode },
+    { label: "데이터", value: `${agentStatus.state.data_count} / ${agentStatus.state.target_data}` },
+    { label: "손실값", value: `${agentStatus.state.loss.toFixed(4)} / ${agentStatus.state.target_loss}` },
+    { label: "반복", value: `${agentStatus.state.iteration} / ${agentStatus.state.max_iteration}` },
+    { label: "상태", value: agentModeLabels[agentStatus.mode] || agentStatus.mode },
   ];
 
   useEffect(() => {
@@ -361,7 +376,7 @@ export default function App() {
       });
       setAgentStatus(data.status);
     } catch (error) {
-      setAgentError(error.message);
+      setAgentError(error.message || "AI 에이전트 요청 중 문제가 생겼습니다.");
     } finally {
       setAgentBusy(false);
     }
@@ -377,7 +392,7 @@ export default function App() {
       });
       setAgentStatus(data.status);
     } catch (error) {
-      setAgentError(error.message);
+      setAgentError(error.message || "AI 에이전트 요청 중 문제가 생겼습니다.");
     } finally {
       setAgentBusy(false);
     }
@@ -2498,17 +2513,17 @@ export default function App() {
               <section className="panel ai-agent-panel">
                 <div className="panel-header">
                   <div>
-                    <p className="mini-label">AI Agent</p>
-                    <h3>학습 파이프라인 코치</h3>
+                    <p className="mini-label">AI 에이전트</p>
+                    <h3>수집·학습 진행 도우미</h3>
                   </div>
                   <div className={`agent-socket-badge ${agentSocketState}`}>
-                    {agentSocketState === "open" ? "Live" : "Polling"}
+                    {agentSocketState === "open" ? "실시간 연결" : "상태 확인 중"}
                   </div>
                 </div>
 
                 <div className="agent-panel-copy">
-                  <strong>지금 수집할지, 학습할지 AI가 판단합니다.</strong>
-                  <p>현재 프로젝트 샘플 수를 상태에 반영하고, 반복 루프를 실행해 데이터 수집과 재학습 여부를 자동으로 결정합니다.</p>
+                  <strong>지금 데이터를 더 모을지, 학습을 시작할지 AI가 판단합니다.</strong>
+                  <p>이 에이전트는 로봇을 직접 가르치는 대신, 현재 프로젝트 상태를 보고 데이터 수집과 재학습 타이밍을 관리해 줍니다.</p>
                 </div>
 
                 <div className="agent-summary-grid">
@@ -2534,7 +2549,7 @@ export default function App() {
                     />
                   </label>
                   <label className="bridge-field">
-                    <span>목표 데이터</span>
+                    <span>목표 데이터 수</span>
                     <input
                       onChange={(event) => updateAgentState("target_data", Number(event.target.value))}
                       type="number"
@@ -2542,7 +2557,7 @@ export default function App() {
                     />
                   </label>
                   <label className="bridge-field">
-                    <span>현재 loss</span>
+                    <span>현재 손실값</span>
                     <input
                       onChange={(event) => updateAgentState("loss", Number(event.target.value))}
                       step="0.01"
@@ -2551,7 +2566,7 @@ export default function App() {
                     />
                   </label>
                   <label className="bridge-field">
-                    <span>목표 loss</span>
+                    <span>목표 손실값</span>
                     <input
                       onChange={(event) => updateAgentState("target_loss", Number(event.target.value))}
                       step="0.01"
@@ -2571,7 +2586,7 @@ export default function App() {
 
                 <div className="robot-toolbar agent-toolbar">
                   <button className="secondary-button" onClick={syncAgentFromProject} type="button">
-                    현재 프로젝트로 채우기
+                    현재 프로젝트 값 가져오기
                   </button>
                   <button className="secondary-button" onClick={() => void refreshAgentStatus()} type="button">
                     상태 새로고침
@@ -2585,7 +2600,7 @@ export default function App() {
                 </div>
 
                 <div className="agent-result-box">
-                  <p className="mini-label">최근 도구 결과</p>
+                  <p className="mini-label">최근 실행 결과</p>
                   <pre>{JSON.stringify(agentStatus.last_tool_result, null, 2)}</pre>
                 </div>
 
@@ -2600,8 +2615,8 @@ export default function App() {
                     agentStatus.logs.slice(-6).map((entry) => (
                       <article className={`agent-log-item ${entry.actor}`} key={`agent-log-${entry.step}`}>
                         <div className="agent-log-meta">
-                          <span>{entry.actor}</span>
-                          <span>step {entry.step}</span>
+                          <span>{agentActorLabels[entry.actor] || entry.actor}</span>
+                          <span>{entry.step}단계</span>
                         </div>
                         <p>{entry.message}</p>
                       </article>

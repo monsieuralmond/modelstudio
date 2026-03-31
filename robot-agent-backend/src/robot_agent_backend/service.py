@@ -44,7 +44,7 @@ class AgentOrchestrator:
                 session_name=payload.session_name,
                 error=None,
             )
-            self._append_log("system", "Agent loop started.")
+            self._append_log("system", "에이전트 반복 실행을 시작했습니다.")
             self._task = asyncio.create_task(self._run_loop(payload.training_config))
             snapshot = self.status.model_copy(deep=True)
         await self.broadcaster.broadcast_status(snapshot)
@@ -64,7 +64,7 @@ class AgentOrchestrator:
             self.status.mode = AgentMode.STOPPED
             self.status.done = True
             self.status.current_action = None
-            self._append_log("system", "Agent loop stopped by operator.")
+            self._append_log("system", "사용자 요청으로 에이전트 실행을 멈췄습니다.")
             snapshot = self.status.model_copy(deep=True)
         await self.broadcaster.broadcast_status(snapshot)
         return snapshot
@@ -101,7 +101,7 @@ class AgentOrchestrator:
                 self.status.mode = AgentMode.ERROR
                 self.status.done = True
                 self.status.error = str(exc)
-                self._append_log("error", f"Agent loop failed: {exc}")
+                self._append_log("error", f"에이전트 실행 중 오류가 발생했습니다: {exc}")
                 snapshot = self.status.model_copy(deep=True)
             await self.broadcaster.broadcast_status(snapshot)
 
@@ -113,7 +113,7 @@ class AgentOrchestrator:
                 self.status.mode = AgentMode.STOPPED
                 self.status.done = True
                 self.status.current_action = None
-                self._append_log("system", "Reached max iteration safety limit.")
+                self._append_log("system", "안전 제한 횟수에 도달해서 실행을 멈춥니다.")
                 snapshot = self.status.model_copy(deep=True)
                 should_stop = True
             else:
@@ -134,7 +134,7 @@ class AgentOrchestrator:
             self.status.state.iteration += 1
             status_snapshot = self.tools.get_training_status()
             self.status.last_tool_result["training_status"] = status_snapshot
-            self._append_log("tool", f"Training status: {status_snapshot['status']} - {status_snapshot['message']}", ActionType.GET_TRAINING_STATUS)
+            self._append_log("tool", f"학습 상태: {status_snapshot['status']} - {status_snapshot['message']}", ActionType.GET_TRAINING_STATUS)
             if action.type == ActionType.FINISH:
                 self.status.mode = AgentMode.FINISHED
                 self.status.done = True
@@ -143,7 +143,7 @@ class AgentOrchestrator:
                 self.status.mode = AgentMode.STOPPED
                 self.status.done = True
                 self.status.current_action = None
-                self._append_log("system", "Stopped after reaching max iteration safety limit.")
+                self._append_log("system", "최대 반복 횟수에 도달해서 실행을 종료했습니다.")
             else:
                 self.status.mode = AgentMode.RUNNING
             snapshot = self.status.model_copy(deep=True)
@@ -162,28 +162,28 @@ class AgentOrchestrator:
                 )
                 state.data_count = result["new_data_count"]
                 self.status.last_tool_result = result
-                self._append_log("tool", f"Data is insufficient, starting data collection. Added {result['collected_count']} samples.", action.type)
+                self._append_log("tool", f"데이터가 부족해서 수집을 시작했습니다. 샘플 {result['collected_count']}개를 추가했습니다.", action.type)
                 return
 
             if action.type == ActionType.START_TRAINING:
                 result = self.tools.start_training(config=action.tool_input["config"], state=state)
                 state.loss = result["new_loss"]
                 self.status.last_tool_result = result
-                self._append_log("tool", f"Loss too high, retraining. New loss is {result['new_loss']}.", action.type)
+                self._append_log("tool", f"손실값이 높아서 다시 학습했습니다. 새 손실값은 {result['new_loss']}입니다.", action.type)
                 return
 
             if action.type == ActionType.GET_TRAINING_STATUS:
                 result = self.tools.get_training_status()
                 self.status.last_tool_result = result
-                self._append_log("tool", f"Training in progress: {result['message']}", action.type)
+                self._append_log("tool", f"학습 진행 상황: {result['message']}", action.type)
                 return
 
             if action.type == ActionType.FINISH:
-                self.status.last_tool_result = {"message": "Goal achieved."}
-                self._append_log("tool", "Target metrics reached. Finishing run.", action.type)
+                self.status.last_tool_result = {"message": "목표를 달성했습니다."}
+                self._append_log("tool", "목표 조건을 만족해서 실행을 마칩니다.", action.type)
                 return
 
-            raise ValueError(f"Unsupported action type: {action.type}")
+            raise ValueError(f"지원하지 않는 액션 타입입니다: {action.type}")
 
     def _append_log(self, actor: str, message: str, action: ActionType | None = None) -> None:
         step = len(self.status.logs) + 1
