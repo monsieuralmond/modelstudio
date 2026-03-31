@@ -19,6 +19,8 @@ class Settings:
     data_collection_script: str
     training_script: str
     status_script: str
+    gpu_training_endpoint: str
+    gpu_status_endpoint: str
 
 
 def get_settings() -> Settings:
@@ -31,4 +33,6 @@ def get_settings() -> Settings:
         data_collection_script=os.getenv("DATA_COLLECTION_SCRIPT", "").strip(),
         training_script=os.getenv("TRAINING_SCRIPT", "").strip(),
         status_script=os.getenv("STATUS_SCRIPT", "").strip(),
+        gpu_training_endpoint=os.getenv("GPU_TRAINING_ENDPOINT", "").strip(),
+        gpu_status_endpoint=os.getenv("GPU_STATUS_ENDPOINT", "").strip(),
     )

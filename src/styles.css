@@ -1291,6 +1291,99 @@ h3 {
   margin-top: 22px;
 }
 
+.simple-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.simple-hero-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.simple-summary-grid,
+.simple-agent-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.simple-flow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.simple-step-card {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.simple-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.simple-step-card strong {
+  font-size: 1.05rem;
+}
+
+.simple-step-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.simple-task-list {
+  display: grid;
+  gap: 12px;
+}
+
+.simple-task-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.simple-task-item div {
+  display: grid;
+  gap: 6px;
+}
+
+.simple-task-item span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.simple-job-box {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+}
+
+.simple-job-box p {
+  margin: 0;
+}
+
 .ai-agent-panel {
   display: grid;
   gap: 18px;
@@ -1502,7 +1595,10 @@ h3 {
   .prediction-list,
   .task-clip-grid,
   .agent-summary-grid,
-  .agent-toolbar {
+  .agent-toolbar,
+  .simple-summary-grid,
+  .simple-agent-status,
+  .simple-flow-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1579,5 +1675,9 @@ h3 {
 
   .header-actions {
     flex-wrap: wrap;
+  }
+
+  .simple-task-item {
+    grid-template-columns: 1fr;
   }
 }

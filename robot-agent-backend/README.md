@@ -22,3 +22,6 @@ uvicorn robot_agent_backend.main:app --reload --app-dir src --host 127.0.0.1 --p
 - `POST /agent/step`
 - `GET /agent/status`
 - `WS /agent/ws`
+- `POST /gpu/train`
+- `GET /gpu/jobs`
+- `GET /gpu/jobs/{job_id}`

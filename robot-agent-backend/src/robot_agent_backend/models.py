@@ -68,3 +68,46 @@ class StepAgentRequest(BaseModel):
 
 class AgentStatusResponse(BaseModel):
     status: PipelineStatus
+
+
+class GpuJobState(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
+class DatasetSummary(BaseModel):
+    mode: str
+    project_name: str
+    task_names: list[str] = Field(default_factory=list)
+    sample_counts: list[int] = Field(default_factory=list)
+    clip_count: int = 0
+    has_raw_episodes: bool = False
+    notes: str = ""
+
+
+class SubmitGpuTrainingRequest(BaseModel):
+    session_name: str
+    dataset: DatasetSummary
+    training_config: dict[str, Any] = Field(default_factory=dict)
+
+
+class GpuJob(BaseModel):
+    job_id: str
+    session_name: str
+    state: GpuJobState
+    message: str
+    progress: int = 0
+    dataset: DatasetSummary
+    training_config: dict[str, Any] = Field(default_factory=dict)
+    remote_job_id: str | None = None
+    result: dict[str, Any] = Field(default_factory=dict)
+
+
+class GpuJobResponse(BaseModel):
+    job: GpuJob
+
+
+class GpuJobListResponse(BaseModel):
+    jobs: list[GpuJob]
