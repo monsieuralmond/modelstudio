@@ -1,6 +1,5 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import * as tf from "@tensorflow/tfjs";
-import * as mobilenet from "@tensorflow-models/mobilenet";
 import * as speechCommands from "@tensorflow-models/speech-commands";
 import * as poseDetection from "@tensorflow-models/pose-detection";
 
@@ -55,7 +54,7 @@ const defaultClassNames = {
 const modeIds = ["image", "audio", "pose"];
 
 const trainingSettings = {
-  image: { epochs: 18, batchSize: 8, denseUnits: 128, dropout: 0.2 },
+  image: { epochs: 12, batchSize: 8, denseUnits: 48, dropout: 0.12, size: 48 },
   pose: { epochs: 24, batchSize: 8, denseUnits: 96, dropout: 0.15 },
   minSamples: 9,
   captureIntervalMs: 180,
@@ -120,7 +119,6 @@ export default function App() {
   const posePredictionAtRef = useRef(0);
   const currentPoseVectorRef = useRef(null);
 
-  const imageBaseModelRef = useRef(null);
   const imageClassifierRef = useRef(null);
   const imageSamplesRef = useRef([]);
 
@@ -399,18 +397,18 @@ export default function App() {
   }
 
   async function ensureImageResources() {
-    if (imageBaseModelRef.current) {
+    if (readyByMode.image) {
       return;
     }
 
     setIsModelLoading(true);
-      setModeStatus("image", "MobileNet 기본 모델을 불러오는 중입니다...");
+    setModeStatus("image", "이미지 학습 백엔드를 준비하는 중입니다...");
 
     try {
+      await tf.setBackend("webgl").catch(() => tf.setBackend("cpu"));
       await tf.ready();
-      imageBaseModelRef.current = await mobilenet.load({ version: 2, alpha: 1 });
       updateReady("image", true);
-      setModeStatus("image", "이미지 모델 준비가 끝났습니다. 카메라를 켜고 샘플을 수집하세요.");
+      setModeStatus("image", `이미지 학습 백엔드 준비 완료: ${tf.getBackend()}. 카메라를 켜고 샘플을 수집하세요.`);
     } catch (error) {
       console.error(error);
       setModeStatus("image", "이미지 모델 로딩에 실패했습니다. 새로고침 후 다시 시도하세요.");
@@ -460,8 +458,15 @@ export default function App() {
       return;
     }
 
-    const embedding = tf.tidy(() => imageBaseModelRef.current.infer(imageVideoRef.current, true));
-    imageSamplesRef.current.push({ embedding, label: classIndex });
+    const imageTensor = tf.tidy(() =>
+      tf.browser
+        .fromPixels(imageVideoRef.current)
+        .resizeBilinear([trainingSettings.image.size, trainingSettings.image.size])
+        .toFloat()
+        .div(255)
+        .expandDims(0),
+    );
+    imageSamplesRef.current.push({ embedding: imageTensor, label: classIndex });
     incrementModeCount("image", classIndex);
     updateTrained("image", false);
     setModePredictions("image", classNamesByMode.image.map(() => 0));
@@ -493,40 +498,79 @@ export default function App() {
     setIsPreviewRunning(false);
     setModeProgress("image", 0);
     setModeStatus("image", "이미지 텐서를 준비하는 중입니다...");
-    imageClassifierRef.current?.dispose();
-
-    const xs = tf.concat(imageSamplesRef.current.map((sample) => sample.embedding));
-    const labels = tf.tensor1d(
-      imageSamplesRef.current.map((sample) => sample.label),
-      "int32",
-    );
-    const classCount = classNamesByMode.image.length;
-    const ys = tf.oneHot(labels, classCount);
-    const inputShape = imageSamplesRef.current[0].embedding.shape.slice(1);
-
-    const classifier = tf.sequential({
-      layers: [
-        tf.layers.flatten({ inputShape }),
-        tf.layers.dense({ units: trainingSettings.image.denseUnits, activation: "relu" }),
-        tf.layers.dropout({ rate: trainingSettings.image.dropout }),
-        tf.layers.dense({ units: classCount, activation: "softmax" }),
-      ],
-    });
-
-    classifier.compile({
-      optimizer: tf.train.adam(0.0008),
-      loss: "categoricalCrossentropy",
-      metrics: ["accuracy"],
-    });
-
-    imageClassifierRef.current = classifier;
 
     try {
+      imageClassifierRef.current?.dispose();
+
+      setModeStatus("image", `샘플 ${imageSamplesRef.current.length}개를 하나의 학습 텐서로 묶는 중입니다...`);
+      await tf.nextFrame();
+      const xs = tf.concat(imageSamplesRef.current.map((sample) => sample.embedding));
+      setModeStatus("image", "라벨 텐서를 준비하는 중입니다...");
+      await tf.nextFrame();
+      const labels = tf.tensor1d(
+        imageSamplesRef.current.map((sample) => sample.label),
+        "int32",
+      );
+      const classCount = classNamesByMode.image.length;
+      const ys = tf.oneHot(labels, classCount);
+      const inputShape = imageSamplesRef.current[0].embedding.shape.slice(1);
+      const batchSize = Math.min(trainingSettings.image.batchSize, imageSamplesRef.current.length);
+      const batchesPerEpoch = Math.max(1, Math.ceil(imageSamplesRef.current.length / batchSize));
+      const totalBatches = trainingSettings.image.epochs * batchesPerEpoch;
+      let completedBatches = 0;
+
+      setModeStatus("image", "이미지 텐서 준비가 끝났습니다. 학습 모델을 구성하는 중입니다...");
+      await tf.nextFrame();
+
+      const classifier = tf.sequential({
+        layers: [
+          tf.layers.conv2d({
+            inputShape,
+            filters: 8,
+            kernelSize: 3,
+            activation: "relu",
+            padding: "same",
+          }),
+          tf.layers.maxPooling2d({ poolSize: 2, strides: 2 }),
+          tf.layers.conv2d({
+            filters: 16,
+            kernelSize: 3,
+            activation: "relu",
+            padding: "same",
+          }),
+          tf.layers.maxPooling2d({ poolSize: 2, strides: 2 }),
+          tf.layers.flatten(),
+          tf.layers.dense({ units: trainingSettings.image.denseUnits, activation: "relu" }),
+          tf.layers.dropout({ rate: trainingSettings.image.dropout }),
+          tf.layers.dense({ units: classCount, activation: "softmax" }),
+        ],
+      });
+
+      classifier.compile({
+        optimizer: tf.train.adam(0.0008),
+        loss: "categoricalCrossentropy",
+        metrics: ["accuracy"],
+      });
+
+      imageClassifierRef.current = classifier;
+      setModeStatus("image", "이미지 모델 구성이 끝났습니다. 학습을 시작합니다...");
+
       await classifier.fit(xs, ys, {
         epochs: trainingSettings.image.epochs,
-        batchSize: Math.min(trainingSettings.image.batchSize, imageSamplesRef.current.length),
+        batchSize,
         shuffle: true,
+        yieldEvery: "batch",
         callbacks: {
+          onBatchEnd: async (_batch, logs) => {
+            completedBatches += 1;
+            const progress = Math.min(99, Math.round((completedBatches / totalBatches) * 100));
+            setModeProgress("image", progress);
+            setModeStatus(
+              "image",
+              `이미지 학습 중... ${progress}%${logs?.loss ? `, 손실 ${logs.loss.toFixed(3)}` : ""}`,
+            );
+            await tf.nextFrame();
+          },
           onEpochEnd: async (epoch, logs) => {
             const progress = Math.round(((epoch + 1) / trainingSettings.image.epochs) * 100);
             setModeProgress("image", progress);
@@ -541,13 +585,17 @@ export default function App() {
 
       updateTrained("image", true);
       setModeStatus("image", "이미지 학습이 끝났습니다. 실시간 미리보기를 시작해보세요.");
-    } catch (error) {
-      console.error(error);
-      setModeStatus("image", "이미지 학습에 실패했습니다. 초기화 후 다시 시도하세요.");
-    } finally {
+
       xs.dispose();
       labels.dispose();
       ys.dispose();
+    } catch (error) {
+      console.error(error);
+      setModeStatus(
+        "image",
+        `이미지 학습에 실패했습니다. ${error?.message ? `오류: ${error.message}` : "초기화 후 다시 시도하세요."}`,
+      );
+    } finally {
       setIsTraining(false);
     }
   }
@@ -555,7 +603,6 @@ export default function App() {
   async function runImagePrediction() {
     if (
       !imageClassifierRef.current ||
-      !imageBaseModelRef.current ||
       !imageVideoRef.current ||
       !imageStreamRef.current ||
       imageVideoRef.current.readyState < 2
@@ -563,10 +610,17 @@ export default function App() {
       return;
     }
 
-    const embedding = imageBaseModelRef.current.infer(imageVideoRef.current, true);
-    const output = imageClassifierRef.current.predict(embedding);
+    const input = tf.tidy(() =>
+      tf.browser
+        .fromPixels(imageVideoRef.current)
+        .resizeBilinear([trainingSettings.image.size, trainingSettings.image.size])
+        .toFloat()
+        .div(255)
+        .expandDims(0),
+    );
+    const output = imageClassifierRef.current.predict(input);
     const values = Array.from(await output.data());
-    embedding.dispose();
+    input.dispose();
     output.dispose();
     setModePredictions("image", values);
   }
