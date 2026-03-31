@@ -116,6 +116,8 @@ export default function App() {
   const [mode, setMode] = useState("image");
   const [studioView, setStudioView] = useState("simple");
   const [isStudioOpen, setIsStudioOpen] = useState(false);
+  const [isProjectNameDialogOpen, setIsProjectNameDialogOpen] = useState(false);
+  const [pendingProjectName, setPendingProjectName] = useState("AI Robot Studio 데모");
   const [projectName, setProjectName] = useState("AI Robot Studio 데모");
   const [classNamesByMode, setClassNamesByMode] = useState(defaultClassNames);
   const [sampleCountsByMode, setSampleCountsByMode] = useState({
@@ -153,7 +155,7 @@ export default function App() {
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [isImageCameraOn, setIsImageCameraOn] = useState(false);
   const [isPoseCameraOn, setIsPoseCameraOn] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("아직 저장된 프로젝트가 없습니다.");
+  const [saveMessage, setSaveMessage] = useState("");
   const [pendingUploadClassIndex, setPendingUploadClassIndex] = useState(null);
   const [bridgeUrl, setBridgeUrl] = useState(() => {
     const saved = window.localStorage.getItem(BRIDGE_URL_KEY);
@@ -2080,6 +2082,19 @@ export default function App() {
     });
   }
 
+  function openProjectNameDialog(nextMode = "image", nextView = "simple") {
+    setMode(nextMode);
+    setStudioView(nextView);
+    setPendingProjectName(projectName || "AI Robot Studio 데모");
+    setIsProjectNameDialogOpen(true);
+  }
+
+  function confirmProjectNameAndOpenStudio() {
+    setProjectName(pendingProjectName.trim() || "AI Robot Studio 데모");
+    setIsProjectNameDialogOpen(false);
+    setIsStudioOpen(true);
+  }
+
   function triggerUpload(classIndex) {
     setPendingUploadClassIndex(classIndex);
     uploadInputRef.current?.click();
@@ -2231,8 +2246,8 @@ export default function App() {
               <span>LeRobot</span>
             </h1>
             <div className="hero-actions">
-              <button className="primary-button" onClick={() => openStudio("image", "simple")} type="button">
-                바로 시작하기
+              <button className="primary-button" onClick={() => openProjectNameDialog("image", "simple")} type="button">
+                시작하기
               </button>
               <button className="secondary-button" onClick={() => openStudio("image", "developer")} type="button">
                 개발자 모드
@@ -2293,7 +2308,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="save-message">{saveMessage}</div>
+          {saveMessage ? <div className="save-message">{saveMessage}</div> : null}
 
           {studioView === "simple" ? (
             <div className="simple-layout">
@@ -2319,7 +2334,7 @@ export default function App() {
                     <strong>{currentTaskCount}개</strong>
                   </div>
                   <div className="summary-card">
-                    <span>GPU 학습 상태</span>
+                    <span>학습 상태</span>
                     <strong>{latestGpuJob ? gpuJobStateLabels[latestGpuJob.state] || latestGpuJob.state : "아직 없음"}</strong>
                   </div>
                 </div>
@@ -2425,7 +2440,7 @@ export default function App() {
                     <div className="panel-header">
                       <div>
                         <p className="mini-label">태스크 / 에피소드</p>
-                        <h3>수집 태스크</h3>
+                        <h3>2. 수집 태스크</h3>
                       </div>
                       <div className="class-panel-actions">
                         <button className="add-class-button" onClick={() => addClass(mode)} type="button">
@@ -2571,7 +2586,7 @@ export default function App() {
 
                   <article className="simple-step-card">
                     <div className="simple-step-number">3</div>
-                    <strong>외부 GPU 학습</strong>
+                    <strong>학습 시키기</strong>
                     <p>브라우저 대신 외부 GPU로 학습 작업을 보내 VESSL 같은 환경에서 훈련할 수 있게 준비합니다.</p>
                     <div className="robot-toolbar">
                       <button className="secondary-button" onClick={syncAgentFromProject} type="button">
@@ -2600,25 +2615,31 @@ export default function App() {
                   <article className="simple-step-card">
                     <div className="simple-step-number">4</div>
                     <strong>결과 확인</strong>
-                    <p>AI 에이전트가 데이터가 충분한지, 더 수집해야 하는지 간단히 알려줍니다.</p>
+                    <p>지금까지 추가한 에피소드 수와 최근 학습 작업 상태를 확인할 수 있습니다.</p>
                     <div className="simple-agent-status">
-                      {agentSummary.map((item) => (
-                        <div className="summary-card" key={`simple-agent-${item.label}`}>
-                          <span>{item.label}</span>
-                          <strong>{item.value}</strong>
-                        </div>
-                      ))}
+                      <div className="summary-card">
+                        <span>에피소드 수</span>
+                        <strong>{currentClipCount}개</strong>
+                      </div>
+                      <div className="summary-card">
+                        <span>최근 학습 상태</span>
+                        <strong>{latestGpuJob ? gpuJobStateLabels[latestGpuJob.state] || latestGpuJob.state : "아직 없음"}</strong>
+                      </div>
                     </div>
                     <div className="simple-job-box">
-                      <strong>AI 안내</strong>
-                      <p>{agentStatus.logs[agentStatus.logs.length - 1]?.message || "아직 실행된 에이전트 로그가 없습니다."}</p>
+                      <strong>최근 결과</strong>
+                      <p>
+                        {currentClipCount > 0
+                          ? `현재 프로젝트에 에피소드 클립 ${currentClipCount}개가 있습니다.`
+                          : "아직 추가된 에피소드가 없습니다."}
+                      </p>
                     </div>
                     <div className="robot-toolbar">
-                      <button className="secondary-button" onClick={() => void refreshAgentStatus()} type="button">
-                        안내 새로고침
+                      <button className="secondary-button" onClick={() => void refreshGpuJobs()} type="button">
+                        결과 새로고침
                       </button>
-                      <button className="primary-button" disabled={agentBusy || isAgentRunning} onClick={() => void startAgentLoop()} type="button">
-                        AI 판단 실행
+                      <button className="secondary-button" onClick={() => setStudioView("developer")} type="button">
+                        개발자 모드 보기
                       </button>
                     </div>
                   </article>
@@ -3496,6 +3517,29 @@ export default function App() {
         ref={uploadInputRef}
         type="file"
       />
+      {isProjectNameDialogOpen && (
+        <div className="dialog-overlay" onClick={() => setIsProjectNameDialogOpen(false)} role="presentation">
+          <div className="dialog-card" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <p className="mini-label">프로젝트 설정</p>
+            <h3>프로젝트 이름을 입력하세요</h3>
+            <input
+              autoFocus
+              className="dialog-input"
+              onChange={(event) => setPendingProjectName(event.target.value)}
+              type="text"
+              value={pendingProjectName}
+            />
+            <div className="dialog-actions">
+              <button className="secondary-button" onClick={() => setIsProjectNameDialogOpen(false)} type="button">
+                취소
+              </button>
+              <button className="primary-button" onClick={confirmProjectNameAndOpenStudio} type="button">
+                시작하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
