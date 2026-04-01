@@ -361,6 +361,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!isStudioOpen) {
+      setIsVesslDialogOpen(false);
+    }
+  }, [isStudioOpen]);
+
+  useEffect(() => {
     if (agentSocketState === "open") {
       return undefined;
     }
@@ -3744,7 +3750,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {isVesslDialogOpen && (
+      {isStudioOpen && isVesslDialogOpen && (
         <div className="dialog-overlay" onClick={() => setIsVesslDialogOpen(false)} role="presentation">
           <div className="dialog-card" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
             <p className="mini-label">VESSL 연결</p>
