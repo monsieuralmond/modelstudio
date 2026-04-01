@@ -186,6 +186,10 @@ export default function App() {
   const [torqueEnabled, setTorqueEnabled] = useState(true);
   const [autoStart, setAutoStart] = useState(0);
   const [autoEnd, setAutoEnd] = useState(4095);
+  const [calibrationMinGoal, setCalibrationMinGoal] = useState(1024);
+  const [calibrationMaxGoal, setCalibrationMaxGoal] = useState(3072);
+  const [capturedCalibrationMin, setCapturedCalibrationMin] = useState(null);
+  const [capturedCalibrationMax, setCapturedCalibrationMax] = useState(null);
   const [autoSweepDelay, setAutoSweepDelay] = useState(2500);
   const [autoStep, setAutoStep] = useState(10);
   const [autoStepDelay, setAutoStepDelay] = useState(10);
@@ -212,6 +216,11 @@ export default function App() {
   const [gpuJobs, setGpuJobs] = useState([]);
   const [gpuBusy, setGpuBusy] = useState(false);
   const [gpuError, setGpuError] = useState("");
+  const [isVesslDialogOpen, setIsVesslDialogOpen] = useState(false);
+  const [vesslAccessToken, setVesslAccessToken] = useState("");
+  const [vesslOrganization, setVesslOrganization] = useState("");
+  const [vesslProject, setVesslProject] = useState("");
+  const [vesslConfigured, setVesslConfigured] = useState(false);
 
   const imageVideoRef = useRef(null);
   const poseVideoRef = useRef(null);
@@ -267,6 +276,38 @@ export default function App() {
   ];
   const currentClipCount = clipLibraryByMode[mode].length;
   const currentTaskCount = currentClassNames.length;
+  const calibrationNeutralTarget = 2048;
+  const calibrationTolerance = 40;
+  const positionError =
+    robotMetrics?.position != null ? Math.abs(robotMetrics.position - calibrationNeutralTarget) : null;
+  const neutralCheck =
+    positionError == null ? null : positionError <= calibrationTolerance;
+  const temperatureCheck =
+    robotMetrics?.temperature == null ? null : robotMetrics.temperature <= 65;
+  const voltageCheck =
+    robotMetrics?.voltage == null ? null : robotMetrics.voltage >= 6.0 && robotMetrics.voltage <= 12.0;
+  const hasCapturedRange =
+    capturedCalibrationMin != null &&
+    capturedCalibrationMax != null &&
+    capturedCalibrationMax > capturedCalibrationMin;
+  const calibrationRange =
+    hasCapturedRange ? capturedCalibrationMax - capturedCalibrationMin : null;
+  const neutralInCapturedRange =
+    hasCapturedRange &&
+    capturedCalibrationMin <= calibrationNeutralTarget &&
+    capturedCalibrationMax >= calibrationNeutralTarget;
+  const calibrationReady =
+    hasCapturedRange &&
+    neutralInCapturedRange &&
+    neutralCheck === true &&
+    temperatureCheck !== false &&
+    voltageCheck !== false;
+  const calibrationStatusText =
+    robotMetrics == null
+      ? "아직 측정값이 없습니다. 상태 읽기 또는 측정 새로고침을 실행하세요."
+      : calibrationReady
+      ? "캘리브레이션 기준을 만족합니다."
+      : "중립/최소각/최대각 측정값을 먼저 저장하고 기준을 다시 확인하세요.";
 
   useEffect(() => {
     return () => {
@@ -313,6 +354,10 @@ export default function App() {
     }, 5000);
 
     return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    void refreshVesslConfig();
   }, []);
 
   useEffect(() => {
@@ -376,6 +421,17 @@ export default function App() {
       setGpuError("");
     } catch (error) {
       setGpuError(error.message || "GPU 작업 상태를 읽지 못했습니다.");
+    }
+  }
+
+  async function refreshVesslConfig() {
+    try {
+      const data = await fetchAgentJson("/vessl/config");
+      setVesslConfigured(Boolean(data.status?.configured));
+      setVesslOrganization(data.status?.organization_name || "");
+      setVesslProject(data.status?.project_name || "");
+    } catch (error) {
+      setGpuError(error.message || "VESSL 설정 상태를 읽지 못했습니다.");
     }
   }
 
@@ -467,6 +523,27 @@ export default function App() {
       setGpuJobs((current) => [data.job, ...current.filter((item) => item.job_id !== data.job.job_id)]);
     } catch (error) {
       setGpuError(error.message || "GPU 학습 요청에 실패했습니다.");
+    } finally {
+      setGpuBusy(false);
+    }
+  }
+
+  async function saveVesslConfig() {
+    setGpuBusy(true);
+    setGpuError("");
+    try {
+      const data = await fetchAgentJson("/vessl/config", {
+        method: "POST",
+        body: JSON.stringify({
+          access_token: vesslAccessToken,
+          organization_name: vesslOrganization,
+          project_name: vesslProject,
+        }),
+      });
+      setVesslConfigured(Boolean(data.status?.configured));
+      setIsVesslDialogOpen(false);
+    } catch (error) {
+      setGpuError(error.message || "VESSL 설정 저장에 실패했습니다.");
     } finally {
       setGpuBusy(false);
     }
@@ -875,6 +952,31 @@ export default function App() {
           error instanceof Error ? error.message : "동작 명령 전송에 실패했습니다.",
       }));
     }
+  }
+
+  function captureCalibrationPoint(type) {
+    if (robotMetrics?.position == null) {
+      setServoToolState((current) => ({
+        ...current,
+        message: "현재 위치 측정값이 없습니다. 먼저 상태 읽기 또는 측정 새로고침을 실행하세요.",
+      }));
+      return;
+    }
+
+    if (type === "min") {
+      setCapturedCalibrationMin(robotMetrics.position);
+      setServoToolState((current) => ({
+        ...current,
+        message: `최소각 기준값을 ${robotMetrics.position}로 저장했습니다.`,
+      }));
+      return;
+    }
+
+    setCapturedCalibrationMax(robotMetrics.position);
+    setServoToolState((current) => ({
+      ...current,
+      message: `최대각 기준값을 ${robotMetrics.position}로 저장했습니다.`,
+    }));
   }
 
   function stopSweep() {
@@ -2438,9 +2540,12 @@ export default function App() {
 
                   <section className="panel workspace-class-panel simple-task-panel">
                     <div className="panel-header">
-                      <div>
-                        <p className="mini-label">태스크 / 에피소드</p>
-                        <h3>2. 수집 태스크</h3>
+                      <div className="simple-step-heading">
+                        <div className="simple-step-number">2</div>
+                        <div>
+                          <p className="mini-label">태스크 / 에피소드</p>
+                          <h3>수집 태스크</h3>
+                        </div>
                       </div>
                       <div className="class-panel-actions">
                         <button className="add-class-button" onClick={() => addClass(mode)} type="button">
@@ -2587,13 +2692,16 @@ export default function App() {
                   <article className="simple-step-card">
                     <div className="simple-step-number">3</div>
                     <strong>학습 시키기</strong>
-                    <p>브라우저 대신 외부 GPU로 학습 작업을 보내 VESSL 같은 환경에서 훈련할 수 있게 준비합니다.</p>
-                    <div className="robot-toolbar">
-                      <button className="secondary-button" onClick={syncAgentFromProject} type="button">
-                        프로젝트 상태 반영
+                    <p>수집한 에피소드를 바탕으로 학습을 시작하고 진행 상황을 확인합니다.</p>
+                    <div className="robot-toolbar simple-training-toolbar">
+                      <button className="secondary-button" onClick={() => setIsVesslDialogOpen(true)} type="button">
+                        {vesslConfigured ? "VESSL 연결 설정" : "VESSL API 키 입력"}
+                      </button>
+                      <button className="secondary-button sync-status-button" onClick={syncAgentFromProject} type="button">
+                        현재 상태 동기화
                       </button>
                       <button className="primary-button" disabled={gpuBusy || currentClipCount === 0} onClick={() => void submitGpuTrainingJob()} type="button">
-                        {gpuBusy ? "전송 중..." : "GPU 학습 시작"}
+                        {gpuBusy ? "전송 중..." : "학습 시작"}
                       </button>
                     </div>
                     <div className="simple-job-box">
@@ -2604,8 +2712,8 @@ export default function App() {
                         </>
                       ) : (
                         <>
-                          <strong>아직 GPU 작업이 없습니다.</strong>
-                          <p>클립을 수집한 뒤 GPU 학습 시작 버튼을 눌러보세요.</p>
+                          <strong>아직 학습 작업이 없습니다.</strong>
+                          <p>에피소드를 수집한 뒤 학습 시작 버튼을 눌러보세요.</p>
                         </>
                       )}
                     </div>
@@ -2614,8 +2722,8 @@ export default function App() {
 
                   <article className="simple-step-card">
                     <div className="simple-step-number">4</div>
-                    <strong>결과 확인</strong>
-                    <p>지금까지 추가한 에피소드 수와 최근 학습 작업 상태를 확인할 수 있습니다.</p>
+                    <strong>AI 에이전트</strong>
+                    <p>현재 모인 에피소드를 바탕으로 더 기록할지, 바로 학습을 진행할지 다음 단계를 안내합니다.</p>
                     <div className="simple-agent-status">
                       <div className="summary-card">
                         <span>에피소드 수</span>
@@ -3313,6 +3421,102 @@ export default function App() {
                     </div>
                   </section>
 
+                  <section className="servo-subpanel servo-calibration-panel">
+                    <div className="panel-header">
+                      <div>
+                        <p className="mini-label">Calibration</p>
+                        <h3>모터 캘리브레이션</h3>
+                      </div>
+                      <button className="secondary-button" onClick={() => void refreshRobotMetrics()} type="button">
+                        측정 새로고침
+                      </button>
+                    </div>
+                    <div className="calibration-guide-list">
+                      <div className="calibration-guide-item"><span>1</span><p>중립(2048)으로 이동해 기구 정렬 상태를 먼저 확인합니다.</p></div>
+                      <div className="calibration-guide-item"><span>2</span><p>최소 회전각 위치로 이동해 현재 위치를 최소각으로 저장합니다.</p></div>
+                      <div className="calibration-guide-item"><span>3</span><p>최대 회전각 위치로 이동해 현재 위치를 최대각으로 저장합니다.</p></div>
+                    </div>
+                    <div className="robot-panel-grid calibration-goal-grid">
+                      <label className="bridge-field">
+                        <span>최소각 목표</span>
+                        <input
+                          onChange={(event) => setCalibrationMinGoal(Number(event.target.value))}
+                          type="number"
+                          value={calibrationMinGoal}
+                        />
+                      </label>
+                      <label className="bridge-field">
+                        <span>최대각 목표</span>
+                        <input
+                          onChange={(event) => setCalibrationMaxGoal(Number(event.target.value))}
+                          type="number"
+                          value={calibrationMaxGoal}
+                        />
+                      </label>
+                    </div>
+                    <div className="robot-toolbar calibration-actions">
+                      <button className="secondary-button" onClick={() => setTorqueEnabled(true)} type="button">
+                        토크 켜기
+                      </button>
+                      <button className="secondary-button" onClick={() => void sendRobotMove(2048)} type="button">
+                        중립(2048) 이동
+                      </button>
+                      <button className="secondary-button" onClick={() => void sendRobotMove(calibrationMinGoal)} type="button">
+                        최소각 이동
+                      </button>
+                      <button className="secondary-button" onClick={() => captureCalibrationPoint("min")} type="button">
+                        현재값 최소각 저장
+                      </button>
+                      <button className="secondary-button" onClick={() => void sendRobotMove(calibrationMaxGoal)} type="button">
+                        최대각 이동
+                      </button>
+                      <button className="secondary-button" onClick={() => captureCalibrationPoint("max")} type="button">
+                        현재값 최대각 저장
+                      </button>
+                    </div>
+                    <div className="calibration-check-grid">
+                      <div className={`calibration-check ${hasCapturedRange ? "ok" : "idle"}`}>
+                        <span>저장된 최소/최대</span>
+                        <strong>{hasCapturedRange ? `${capturedCalibrationMin} / ${capturedCalibrationMax}` : "- / -"}</strong>
+                        <em>캘리브레이션 기준값</em>
+                      </div>
+                      <div className={`calibration-check ${hasCapturedRange ? "ok" : "warn"}`}>
+                        <span>회전 범위</span>
+                        <strong>{calibrationRange == null ? "-" : `${calibrationRange}`}</strong>
+                        <em>최소각~최대각 차이</em>
+                      </div>
+                      <div className={`calibration-check ${neutralCheck === true ? "ok" : neutralCheck === false ? "warn" : "idle"}`}>
+                        <span>중립 오차</span>
+                        <strong>{positionError == null ? "-" : `${positionError}`}</strong>
+                        <em>{`허용치 ±${calibrationTolerance}`}</em>
+                      </div>
+                      <div className={`calibration-check ${neutralInCapturedRange ? "ok" : "warn"}`}>
+                        <span>중립 포함</span>
+                        <strong>{neutralInCapturedRange ? "포함됨" : "미포함"}</strong>
+                        <em>2048이 최소/최대 사이에 있는지 확인</em>
+                      </div>
+                      <div className={`calibration-check ${temperatureCheck === true ? "ok" : temperatureCheck === false ? "warn" : "idle"}`}>
+                        <span>온도</span>
+                        <strong>{robotMetrics?.temperature == null ? "-" : `${robotMetrics.temperature}°C`}</strong>
+                        <em>권장 65°C 이하</em>
+                      </div>
+                      <div className={`calibration-check ${voltageCheck === true ? "ok" : voltageCheck === false ? "warn" : "idle"}`}>
+                        <span>전압</span>
+                        <strong>{robotMetrics?.voltage == null ? "-" : `${robotMetrics.voltage}V`}</strong>
+                        <em>권장 6.0V ~ 12.0V</em>
+                      </div>
+                      <div className={`calibration-check ${calibrationReady ? "ok" : "idle"}`}>
+                        <span>판정</span>
+                        <strong>{calibrationReady ? "정상" : "점검 필요"}</strong>
+                        <em>캘리브레이션 상태</em>
+                      </div>
+                    </div>
+                    <div className="workspace-empty compact">
+                      <strong>{calibrationStatusText}</strong>
+                      <p>중립에서 기구부가 비틀리면 링크를 재정렬한 뒤 다시 측정하세요.</p>
+                    </div>
+                  </section>
+
                   <section className="servo-subpanel servo-auto-panel">
                     <div className="panel-header">
                       <div>
@@ -3535,6 +3739,44 @@ export default function App() {
               </button>
               <button className="primary-button" onClick={confirmProjectNameAndOpenStudio} type="button">
                 시작하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isVesslDialogOpen && (
+        <div className="dialog-overlay" onClick={() => setIsVesslDialogOpen(false)} role="presentation">
+          <div className="dialog-card" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <p className="mini-label">VESSL 연결</p>
+            <h3>VESSL API 키를 입력하세요</h3>
+            <p className="dialog-help">학습 작업을 연결하기 위한 정보입니다. 저장하면 백엔드 설정에 반영됩니다.</p>
+            <input
+              className="dialog-input"
+              onChange={(event) => setVesslAccessToken(event.target.value)}
+              placeholder="VESSL Access Token"
+              type="password"
+              value={vesslAccessToken}
+            />
+            <input
+              className="dialog-input"
+              onChange={(event) => setVesslOrganization(event.target.value)}
+              placeholder="Organization 이름"
+              type="text"
+              value={vesslOrganization}
+            />
+            <input
+              className="dialog-input"
+              onChange={(event) => setVesslProject(event.target.value)}
+              placeholder="Project 이름"
+              type="text"
+              value={vesslProject}
+            />
+            <div className="dialog-actions">
+              <button className="secondary-button" onClick={() => setIsVesslDialogOpen(false)} type="button">
+                취소
+              </button>
+              <button className="primary-button" onClick={() => void saveVesslConfig()} type="button">
+                저장
               </button>
             </div>
           </div>

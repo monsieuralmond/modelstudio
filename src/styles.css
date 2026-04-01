@@ -865,7 +865,8 @@ h3 {
   grid-template-columns: minmax(320px, 0.84fr) minmax(0, 1.16fr);
   grid-template-areas:
     "list control"
-    "feedback auto"
+    "feedback calibration"
+    "auto calibration"
     "data data";
   align-items: start;
   margin-top: 18px;
@@ -895,6 +896,10 @@ h3 {
 
 .servo-auto-panel {
   grid-area: auto;
+}
+
+.servo-calibration-panel {
+  grid-area: calibration;
 }
 
 .servo-data-panel {
@@ -958,6 +963,82 @@ h3 {
 
 .servo-bottom-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.calibration-guide-list {
+  display: grid;
+  gap: 10px;
+}
+
+.calibration-guide-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.calibration-guide-item span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.calibration-guide-item p {
+  margin: 3px 0 0;
+}
+
+.calibration-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.calibration-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.calibration-check {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.calibration-check span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.calibration-check strong {
+  font-size: 1.02rem;
+}
+
+.calibration-check em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.82rem;
+}
+
+.calibration-check.ok {
+  border-color: rgba(85, 213, 155, 0.4);
+  background: rgba(85, 213, 155, 0.12);
+}
+
+.calibration-check.warn {
+  border-color: rgba(255, 176, 97, 0.42);
+  background: rgba(255, 176, 97, 0.12);
+}
+
+.calibration-goal-grid {
+  margin-top: 6px;
 }
 
 .feedback-grid {
@@ -1293,12 +1374,17 @@ h3 {
 
 .simple-layout {
   display: grid;
-  gap: 18px;
+  gap: 22px;
+  width: min(1240px, 100%);
+  margin: 0 auto;
 }
 
 .simple-hero-panel {
   display: grid;
   gap: 18px;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 24px;
 }
 
 .simple-summary-grid,
@@ -1319,7 +1405,9 @@ h3 {
 .simple-flow-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 18px;
+  gap: 22px;
+  width: min(1120px, 100%);
+  margin: 0 auto;
 }
 
 .simple-camera-panel {
@@ -1332,11 +1420,25 @@ h3 {
 
 .simple-step-card {
   display: grid;
-  gap: 14px;
-  padding: 22px;
-  border-radius: 22px;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 24px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(160deg, rgba(130, 188, 255, 0.08), rgba(255, 255, 255, 0.03) 42%, rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 36px rgba(3, 12, 28, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.simple-step-card:hover {
+  border-color: rgba(124, 176, 255, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 18px 42px rgba(3, 12, 28, 0.34);
+  transform: translateY(-1px);
 }
 
 .simple-step-number {
@@ -1352,7 +1454,7 @@ h3 {
 }
 
 .simple-step-card strong {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
 }
 
 .simple-step-card p {
@@ -1392,8 +1494,8 @@ h3 {
   gap: 8px;
   padding: 16px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--line);
+  background: linear-gradient(160deg, rgba(130, 188, 255, 0.08), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(124, 176, 255, 0.28);
 }
 
 .simple-job-box p {
@@ -1405,7 +1507,67 @@ h3 {
 }
 
 .simple-task-panel {
-  padding: 22px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px;
+  border-radius: 24px;
+}
+
+.simple-step-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.simple-step-heading > div:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.simple-step-heading h3 {
+  margin: 0;
+}
+
+.simple-training-toolbar {
+  background: rgba(3, 12, 28, 0.26);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.simple-step-card .robot-toolbar {
+  width: min(840px, 100%);
+  margin: 4px auto 0;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.simple-step-card .simple-job-box {
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.simple-task-panel .workspace-empty {
+  text-align: center;
+  justify-items: center;
+  padding: 24px 20px;
+}
+
+.simple-task-panel .panel-header {
+  align-items: center;
+  gap: 16px;
+}
+
+.simple-task-panel .class-panel-actions {
+  align-items: center;
+}
+
+.sync-status-button {
+  border-color: rgba(124, 176, 255, 0.36);
+  background: rgba(114, 168, 255, 0.16);
+}
+
+.sync-status-button:hover {
+  background: rgba(114, 168, 255, 0.24);
 }
 
 .dialog-overlay {
@@ -1433,6 +1595,12 @@ h3 {
   margin: 0;
   font-size: 1.4rem;
   font-family: "Lexend", sans-serif;
+}
+
+.dialog-help {
+  margin: -6px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .dialog-input {
@@ -1656,6 +1824,8 @@ h3 {
   .servo-bottom-grid,
   .feedback-grid,
   .servo-actions-grid,
+  .calibration-actions,
+  .calibration-check-grid,
   .control-mode-row,
   .task-config-grid,
   .class-list,

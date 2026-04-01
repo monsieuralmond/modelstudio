@@ -111,3 +111,19 @@ class GpuJobResponse(BaseModel):
 
 class GpuJobListResponse(BaseModel):
     jobs: list[GpuJob]
+
+
+class VesslConfigRequest(BaseModel):
+    access_token: str
+    organization_name: str = ""
+    project_name: str = ""
+
+
+class VesslConfigStatus(BaseModel):
+    configured: bool
+    organization_name: str = ""
+    project_name: str = ""
+
+
+class VesslConfigResponse(BaseModel):
+    status: VesslConfigStatus

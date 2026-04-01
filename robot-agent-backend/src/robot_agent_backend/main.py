@@ -12,13 +12,17 @@ from .models import (
     StartAgentRequest,
     StepAgentRequest,
     SubmitGpuTrainingRequest,
+    VesslConfigRequest,
+    VesslConfigResponse,
 )
 from .service import AgentOrchestrator
+from .vessl_service import VesslConfigService
 
 
 settings = get_settings()
 orchestrator = AgentOrchestrator(settings)
 gpu_service = GpuTrainingService(settings)
+vessl_service = VesslConfigService(settings)
 
 app = FastAPI(title="Robot Training Agent API")
 app.add_middleware(
@@ -92,3 +96,13 @@ async def get_gpu_job(job_id: str) -> GpuJobResponse:
 
         raise HTTPException(status_code=404, detail="GPU 작업을 찾을 수 없습니다.")
     return GpuJobResponse(job=job)
+
+
+@app.get("/vessl/config", response_model=VesslConfigResponse)
+async def get_vessl_config() -> VesslConfigResponse:
+    return VesslConfigResponse(status=vessl_service.status())
+
+
+@app.post("/vessl/config", response_model=VesslConfigResponse)
+async def set_vessl_config(payload: VesslConfigRequest) -> VesslConfigResponse:
+    return VesslConfigResponse(status=vessl_service.set_config(payload))

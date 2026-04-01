@@ -21,6 +21,9 @@ class Settings:
     status_script: str
     gpu_training_endpoint: str
     gpu_status_endpoint: str
+    vessl_access_token: str
+    vessl_default_organization: str
+    vessl_default_project: str
 
 
 def get_settings() -> Settings:
@@ -35,4 +38,7 @@ def get_settings() -> Settings:
         status_script=os.getenv("STATUS_SCRIPT", "").strip(),
         gpu_training_endpoint=os.getenv("GPU_TRAINING_ENDPOINT", "").strip(),
         gpu_status_endpoint=os.getenv("GPU_STATUS_ENDPOINT", "").strip(),
+        vessl_access_token=os.getenv("VESSL_ACCESS_TOKEN", "").strip(),
+        vessl_default_organization=os.getenv("VESSL_DEFAULT_ORGANIZATION", "").strip(),
+        vessl_default_project=os.getenv("VESSL_DEFAULT_PROJECT", "").strip(),
     )
