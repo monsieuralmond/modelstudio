@@ -13,7 +13,7 @@ const AGENT_WS_URL = AGENT_API_BASE_URL.replace(/^http/, "ws");
 
 const projectModes = {
   image: {
-    title: "LeRobot 학습",
+    title: "LeRobot Learning Studio",
     badge: "비전",
     subtitle: "로봇에 연결된 카메라 화면으로 태스크별 에피소드를 기록합니다.",
     description: "",
@@ -23,7 +23,7 @@ const projectModes = {
     trainingBadge: "LeRobot 비전 학습",
   },
   audio: {
-    title: "LeRobot 학습 세션",
+    title: "LeRobot Learning Studio",
     badge: "세션",
     subtitle: "수집, 학습, 기록을 하나의 실험 세션으로 관리합니다.",
     description:
@@ -34,7 +34,7 @@ const projectModes = {
     trainingBadge: "실험 세션 기록",
   },
   pose: {
-    title: "LeRobot 테스트",
+    title: "LeRobot Learning Studio",
     badge: "테스트",
     subtitle: "학습 결과와 서보 반응을 실시간으로 검증합니다.",
     description:
@@ -217,6 +217,7 @@ export default function App() {
   const [gpuBusy, setGpuBusy] = useState(false);
   const [gpuError, setGpuError] = useState("");
   const [isVesslDialogOpen, setIsVesslDialogOpen] = useState(false);
+  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const [vesslAccessToken, setVesslAccessToken] = useState("");
   const [vesslOrganization, setVesslOrganization] = useState("");
   const [vesslProject, setVesslProject] = useState("");
@@ -238,6 +239,7 @@ export default function App() {
   const currentPoseVectorRef = useRef(null);
   const sweepTimerRef = useRef(null);
   const recordTimerRef = useRef(null);
+  const headerMenuRef = useRef(null);
 
   const imageClassifierRef = useRef(null);
   const imageSamplesRef = useRef([]);
@@ -363,8 +365,24 @@ export default function App() {
   useEffect(() => {
     if (!isStudioOpen) {
       setIsVesslDialogOpen(false);
+      setIsHeaderMenuOpen(false);
     }
   }, [isStudioOpen]);
+
+  useEffect(() => {
+    if (!isHeaderMenuOpen) {
+      return undefined;
+    }
+
+    function handleClickOutside(event) {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(event.target)) {
+        setIsHeaderMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isHeaderMenuOpen]);
 
   useEffect(() => {
     if (agentSocketState === "open") {
@@ -2349,9 +2367,7 @@ export default function App() {
           <div className="landing-copy">
             <span className="status-pill">LEROBOT PLATFORM</span>
             <h1>
-              <span>Connect, Train, Test</span>
-              <br />
-              <span>LeRobot</span>
+              <span>LeRobot Learning Studio</span>
             </h1>
             <div className="hero-actions">
               <button className="primary-button" onClick={() => openProjectNameDialog("image", "simple")} type="button">
@@ -2400,18 +2416,62 @@ export default function App() {
                 >
                   개발자 모드
                 </button>
-                <button className="secondary-button" onClick={saveProject} type="button">
-                  저장
-                </button>
-                <button className="secondary-button" onClick={() => void loadSavedProject()} type="button">
-                  불러오기
-                </button>
-                <button className="primary-button" onClick={() => void exportCurrentMode()} type="button">
-                  내보내기
-                </button>
-                <button className="ghost-button" onClick={() => setIsStudioOpen(false)} type="button">
-                  닫기
-                </button>
+                <div className="header-menu-wrap" ref={headerMenuRef}>
+                  <button
+                    aria-expanded={isHeaderMenuOpen}
+                    className="menu-trigger-button"
+                    onClick={() => setIsHeaderMenuOpen((current) => !current)}
+                    type="button"
+                  >
+                    <span />
+                    <span />
+                    <span />
+                  </button>
+                  {isHeaderMenuOpen && (
+                    <div className="header-dropdown-menu">
+                      <button
+                        className="menu-item-button"
+                        onClick={() => {
+                          saveProject();
+                          setIsHeaderMenuOpen(false);
+                        }}
+                        type="button"
+                      >
+                        저장
+                      </button>
+                      <button
+                        className="menu-item-button"
+                        onClick={() => {
+                          void loadSavedProject();
+                          setIsHeaderMenuOpen(false);
+                        }}
+                        type="button"
+                      >
+                        불러오기
+                      </button>
+                      <button
+                        className="menu-item-button"
+                        onClick={() => {
+                          void exportCurrentMode();
+                          setIsHeaderMenuOpen(false);
+                        }}
+                        type="button"
+                      >
+                        내보내기
+                      </button>
+                      <button
+                        className="menu-item-button danger"
+                        onClick={() => {
+                          setIsStudioOpen(false);
+                          setIsHeaderMenuOpen(false);
+                        }}
+                        type="button"
+                      >
+                        닫기
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
