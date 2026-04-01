@@ -1575,19 +1575,22 @@ h3 {
   border-radius: 24px;
 }
 
-.simple-step-heading {
+.simple-step-title {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.simple-step-heading > div:last-child {
-  display: grid;
-  gap: 2px;
+.simple-step-title h3 {
+  margin: 0;
+  font-size: 1.15rem;
 }
 
-.simple-step-heading h3 {
+.simple-next-action {
   margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+  font-weight: 600;
 }
 
 .simple-training-toolbar {

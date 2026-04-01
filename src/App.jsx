@@ -278,6 +278,22 @@ export default function App() {
   ];
   const currentClipCount = clipLibraryByMode[mode].length;
   const currentTaskCount = currentClassNames.length;
+  const aiNextAction =
+    currentClipCount === 0
+      ? "태스크를 추가하고 첫 에피소드를 기록해보세요."
+      : latestGpuJob?.state === "running"
+      ? "학습이 진행 중입니다. 진행률이 100%가 될 때까지 기다려주세요."
+      : latestGpuJob?.state === "queued"
+      ? "학습 요청이 접수되었습니다. 잠시 후 진행 상태를 확인하세요."
+      : latestGpuJob?.state === "completed"
+      ? "학습이 완료되었습니다. 테스트를 실행하거나 새 데이터를 추가해 보완하세요."
+      : latestGpuJob?.state === "error"
+      ? "학습 중 오류가 발생했습니다. 설정을 확인한 뒤 다시 학습을 시작하세요."
+      : "데이터가 준비되었습니다. 학습 시키기 단계에서 학습 시작을 눌러보세요.";
+  const aiGuideText =
+    currentClipCount === 0
+      ? "아직 데이터가 없어요. 에피소드를 1개만 기록해도 다음 단계가 훨씬 쉬워집니다."
+      : "현재 프로젝트 상태를 바탕으로 다음 작업을 AI가 이해하기 쉬운 안내로 정리합니다.";
   const calibrationNeutralTarget = 2048;
   const calibrationTolerance = 40;
   const positionError =
@@ -2591,8 +2607,10 @@ export default function App() {
                 )}
                 <div className="simple-flow-grid">
                   <article className="simple-step-card">
-                    <div className="simple-step-number">1</div>
-                    <strong>로봇 연결</strong>
+                    <div className="simple-step-title">
+                      <div className="simple-step-number">1</div>
+                      <h3>로봇 연결</h3>
+                    </div>
                     <p>포트를 감지하고 자동 연결을 시도합니다.</p>
                     <div className="robot-toolbar">
                       <button className="secondary-button" onClick={() => void loadRobotPorts()} type="button">
@@ -2606,12 +2624,9 @@ export default function App() {
 
                   <section className="panel workspace-class-panel simple-task-panel">
                     <div className="panel-header">
-                      <div className="simple-step-heading">
+                      <div className="simple-step-title">
                         <div className="simple-step-number">2</div>
-                        <div>
-                          <p className="mini-label">태스크 / 에피소드</p>
-                          <h3>수집 태스크</h3>
-                        </div>
+                        <h3>수집 태스크</h3>
                       </div>
                       <div className="class-panel-actions">
                         <button className="add-class-button" onClick={() => addClass(mode)} type="button">
@@ -2756,8 +2771,10 @@ export default function App() {
                   </section>
 
                   <article className="simple-step-card">
-                    <div className="simple-step-number">3</div>
-                    <strong>학습 시키기</strong>
+                    <div className="simple-step-title">
+                      <div className="simple-step-number">3</div>
+                      <h3>학습 시키기</h3>
+                    </div>
                     <p>수집한 에피소드를 바탕으로 학습을 시작하고 진행 상황을 확인합니다.</p>
                     <div className="robot-toolbar simple-training-toolbar">
                       <button className="secondary-button" onClick={() => setIsVesslDialogOpen(true)} type="button">
@@ -2787,17 +2804,19 @@ export default function App() {
                   </article>
 
                   <article className="simple-step-card">
-                    <div className="simple-step-number">4</div>
-                    <strong>AI 에이전트</strong>
-                    <p>현재 모인 에피소드를 바탕으로 더 기록할지, 바로 학습을 진행할지 다음 단계를 안내합니다.</p>
+                    <div className="simple-step-title">
+                      <div className="simple-step-number">4</div>
+                      <h3>AI 에이전트</h3>
+                    </div>
+                    <p>{aiGuideText}</p>
                     <div className="simple-agent-status">
                       <div className="summary-card">
                         <span>에피소드 수</span>
                         <strong>{currentClipCount}개</strong>
                       </div>
                       <div className="summary-card">
-                        <span>최근 학습 상태</span>
-                        <strong>{latestGpuJob ? gpuJobStateLabels[latestGpuJob.state] || latestGpuJob.state : "아직 없음"}</strong>
+                        <span>다음 추천</span>
+                        <p className="simple-next-action">{aiNextAction}</p>
                       </div>
                     </div>
                     <div className="simple-job-box">
