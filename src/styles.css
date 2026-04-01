@@ -1573,7 +1573,7 @@ h3 {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: 60;
   display: grid;
   place-items: center;
   background: rgba(3, 9, 18, 0.68);

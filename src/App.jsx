@@ -2741,16 +2741,26 @@ export default function App() {
                       </div>
                     </div>
                     <div className="simple-job-box">
-                      <strong>최근 결과</strong>
-                      <p>
-                        {currentClipCount > 0
-                          ? `현재 프로젝트에 에피소드 클립 ${currentClipCount}개가 있습니다.`
-                          : "아직 추가된 에피소드가 없습니다."}
-                      </p>
+                      <strong>진행 상황</strong>
+                      {latestGpuJob ? (
+                        <>
+                          <p>{latestGpuJob.message || "학습 작업 진행 상황을 확인하는 중입니다."}</p>
+                          <div className="progress-track">
+                            <span style={{ width: `${Math.max(0, Math.min(100, latestGpuJob.progress ?? 0))}%` }} />
+                          </div>
+                          <p>{`진행률 ${Math.max(0, Math.min(100, latestGpuJob.progress ?? 0))}%`}</p>
+                        </>
+                      ) : (
+                        <p>
+                          {currentClipCount > 0
+                            ? "학습 시작 버튼을 누르면 여기에서 실시간 진행 상황을 볼 수 있습니다."
+                            : "아직 추가된 에피소드가 없습니다."}
+                        </p>
+                      )}
                     </div>
                     <div className="robot-toolbar">
                       <button className="secondary-button" onClick={() => void refreshGpuJobs()} type="button">
-                        결과 새로고침
+                        진행 새로고침
                       </button>
                       <button className="secondary-button" onClick={() => setStudioView("developer")} type="button">
                         개발자 모드 보기
